@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malicious URL Explorer</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<main class="container">
+    <h1>Malicious URL Explorer</h1>
+    <p>Explore reported malware distribution URLs from URLhaus.</p>
+
+    <form method="POST" class="filter-form">
+
+        <div class="form-group">
+            <label for="start_date">Start Date</label>
+            <input type="date" id="start_date"
+                   name="start_date" value="{{ start_date }}">
+        </div>
+
+        <div class="form-group">
+            <label for="end_date">End Date</label>
+            <input type="date" id="end_date"
+                   name="end_date" value="{{ end_date }}">
+        </div>
+
+        <div class="form-group">
+            <label for="threat">Threat Category</label>
+            <select id="threat" name="threat">
+                <option value="all">All Threats</option>
+                {% for threat in threats %}
+                <option value="{{ threat }}"
+                    {% if selected_threat == threat %}selected{% endif %}>
+                    {{ threat }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="tag">Malware Tag</label>
+            <select id="tag" name="tag">
+                <option value="all">All Tags</option>
+                {% for tag in tags %}
+                <option value="{{ tag }}"
+                    {% if selected_tag == tag %}selected{% endif %}>
+                    {{ tag }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit">Fetch URLs</button>
+    </form>
+
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if total_records is not none %}
+    <section class="results">
+        <h2>Fetch Results</h2>
+        <p><strong>{{ total_records }}</strong> matching records found.</p>
+
+        {% if records %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date Added</th>
+                        <th>Defanged URL</th>
+                        <th>Status</th>
+                        <th>Threat</th>
+                        <th>Tags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td>{{ record.id }}</td>
+                        <td>{{ record.dateadded }}</td>
+                        <td class="url-cell">{{ record.defanged_url }}</td>
+                        <td>{{ record.url_status }}</td>
+                        <td>{{ record.threat }}</td>
+                        <td>{{ record.tags }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p>No records match your selected filters.</p>
+        {% endif %}
+
+        <a href="{{ url_for('results_page') }}" class="results-link">
+            View Results
+        </a>
+    </section>
+    {% endif %}
+</main>
+
+</body>
+</html>

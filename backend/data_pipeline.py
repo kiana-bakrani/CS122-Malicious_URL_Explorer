@@ -7,6 +7,43 @@ from backend.filters import (
     filter_by_tag
 )
 
+import time
+
+from backend.data_storage import (
+    DATA_DIR,
+    save_cleaned_data,
+    load_csv_data
+)
+from backend.urlhaus_api import download_recent_export
+from backend.data_cleaner import clean_urlhaus_data
+
+CACHE_SECONDS = 300 # might change it later
+def get_cleaned_data():
+    """Return cached URLhaus data or download fresh data."""
+
+    cache_path = DATA_DIR / "cleaned_urls.csv"
+
+    # Check whether the cache exists
+    if cache_path.exists():
+        cache_age = time.time() - cache_path.stat().st_mtime
+
+        # Use cached data if less than 5 minutes old
+        if cache_age < CACHE_SECONDS:
+            print("Using cached URLhaus data.")
+            return load_csv_data(cache_path)
+
+    # Download new data if cache is missing or expired
+    print("Downloading fresh URLhaus data...")
+
+    csv_text = download_recent_export()
+    df = clean_urlhaus_data(csv_text)
+
+    if df.empty:
+        raise ValueError("No URLhaus records were downloaded.")
+
+    save_cleaned_data(df)
+
+    return df
 
 def run_pipeline(start_date=None, end_date=None, threat=None, tag=None):
     """Download, clean, filter, and save URLhaus records."""
