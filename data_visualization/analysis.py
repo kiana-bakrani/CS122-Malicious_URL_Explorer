@@ -72,6 +72,18 @@ def count_daily_additions(records):
     return counts.reindex(groups, fill_value=0).reset_index(name="url_count")
 
 
+def count_daily_totals(records):
+    """Total reported additions per UTC day across all threat categories.
+
+    Use prepared records, optionally filtered to a selected country or tag.
+    The output includes zero-count days between the first and last valid dates.
+    """
+    daily = count_daily_additions(records)
+    if daily.empty:
+        return pd.DataFrame(columns=["date", "url_count"])
+    return daily.groupby("date", as_index=False)["url_count"].sum()
+
+
 def summarize_status(records):
     """Calculate offline percentage among records with a known status only."""
     online = int(records["url_status"].eq("online").sum())

@@ -5,7 +5,7 @@ import pytest
 
 from data_visualization.analysis import (
     prepare_records, count_by_category, count_by_tag,
-    count_daily_additions, summarize_status,
+    count_daily_additions, count_daily_totals, summarize_status,
 )
 
 
@@ -42,3 +42,31 @@ def test_no_known_status_or_valid_dates_does_not_claim_zero_percent(empty):
     assert summarize_status(records)["offline_percentage"] is None
     assert count_daily_additions(records).empty
     assert count_by_tag(records).empty
+
+
+def test_daily_totals_combine_threats_and_normalize_dates_to_utc():
+    source = pd.DataFrame({
+        "dateadded": [
+            "2026-11-01T12:00:00+00:00",
+            "2026-11-01T13:00:00+00:00",
+            "2026-11-02T23:30:00-08:00",
+        ],
+        "threat": ["category_a", "category_b", "category_a"],
+        "url_status": ["online"] * 3,
+    })
+    daily = count_daily_totals(prepare_records(source))
+    assert daily["url_count"].tolist() == [2, 0, 1]
+    assert daily["date"].dt.strftime("%Y-%m-%d").tolist() == [
+        "2026-11-01", "2026-11-02", "2026-11-03"
+    ]
+    assert daily["url_count"].sum() == len(source)
+
+
+def test_daily_totals_handle_no_valid_dates():
+    records = prepare_records(pd.DataFrame({
+        "dateadded": [None], "url_status": ["unknown"]
+    }))
+    for selection in [records, records.iloc[:0]]:
+        daily = count_daily_totals(selection)
+        assert daily.empty
+        assert daily.columns.tolist() == ["date", "url_count"]
