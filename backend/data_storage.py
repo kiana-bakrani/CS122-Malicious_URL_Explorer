@@ -1,5 +1,6 @@
 
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import pandas as pd
 
 # Project root directory
@@ -28,9 +29,23 @@ def save_filtered_data(df):
 
     file_path = DATA_DIR / "filtered_urls.csv"
 
-    df.to_csv(file_path, index=False)
+    with NamedTemporaryFile(dir=DATA_DIR, delete=False) as temporary:
+        temporary_path = Path(temporary.name)
+    try:
+        df.to_csv(temporary_path, index=False)
+        temporary_path.replace(file_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
     return file_path
+
+
+def load_filtered_data():
+    """Read the dataset from the latest successful Fetch submission."""
+    records = load_csv_data(DATA_DIR / "filtered_urls.csv")
+    if "country" not in records:
+        records["country"] = "Unknown"
+    return records
 
 
 def load_csv_data(file_path):

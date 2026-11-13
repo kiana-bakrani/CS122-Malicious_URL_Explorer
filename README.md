@@ -64,3 +64,11 @@ URLhaus focuses on malware distribution URLs; the threat field may offer limited
 ## License
 
 Project code uses the [BSD 3-Clause License](LICENSE). URLhaus data remains subject to its provider's terms and attribution requirements.
+
+## Country lookup setup
+
+Install the packages in `requirements.txt`. Download and decompress the [DB-IP IP to Country Lite MMDB](https://db-ip.com/db/download/ip-to-country-lite) into `data/cache/dbip-country-lite.mmdb`.
+
+Each Search submission adds `country` to `data/filtered_urls.csv`. It contains a two-letter country code such as `US`, or `Unknown` when a country cannot be determined within the lookup time limit. Country estimates describe the resolved infrastructure. Successful lookups are cached for 24 hours in `data/cache/country_cache.sqlite3`. Replace the MMDB with a newer release to refresh the geolocation data.
+
+[IP Geolocation by DB-IP](https://db-ip.com). Include this attribution on Results pages that use the country data.

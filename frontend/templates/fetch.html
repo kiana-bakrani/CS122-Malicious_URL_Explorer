@@ -6,25 +6,46 @@
     <title>Malicious URL Explorer</title>
     <link rel="stylesheet"
           href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
 </head>
 <body>
 
 <main class="container">
     <h1>Malicious URL Explorer</h1>
-    <p>Explore reported malware distribution URLs from URLhaus.</p>
+    <p>Explore reported malware distribution URLs from the <a href="https://urlhaus.abuse.ch/api/#csv">URLhaus recent export</a>.</p>
+    <p id="snapshot-status" role="status"{% if not downloaded_at %} hidden{% endif %}>
+        Snapshot downloaded at
+        <time id="snapshot-time"{% if downloaded_at %} datetime="{{ downloaded_at.isoformat() }}"{% endif %}>
+            {% if downloaded_at %}{{ downloaded_at.strftime("%I:%M %p UTC").lstrip("0") }}{% endif %}
+        </time>
+    </p>
 
-    <form method="POST" class="filter-form">
+    {% if not preview_only %}
+    <form action="{{ url_for('fetch_page') }}" method="POST" class="filter-form" data-tags-url="{{ url_for('fetch_tags') }}"
+          data-max-date-days="{{ max_date_days }}">
+        <div class="search-toolbar">
+            <input type="search" name="q" value="{{ query }}" aria-label="Search by URL"
+                   placeholder="Search by URL or domain…" autocomplete="off">
+            <button type="button" id="filter-toggle" aria-controls="filter-panel"
+                    aria-expanded="true" hidden>Hide Filters</button>
+            <button type="submit">Search</button>
+        </div>
+        <div id="filter-panel" data-start-open="{{ 'true' if error else 'false' }}">
+            <p id="date-help">Choose dates within the latest {{ max_date_days }} UTC calendar days, including today.</p>
+            <div class="filter-fields">
 
         <div class="form-group">
             <label for="start_date">Start Date</label>
             <input type="date" id="start_date"
-                   name="start_date" value="{{ start_date }}">
+                   name="start_date" value="{{ start_date }}" min="{{ earliest_date }}" max="{{ today }}"
+                   required aria-describedby="date-help">
         </div>
 
         <div class="form-group">
             <label for="end_date">End Date</label>
             <input type="date" id="end_date"
-                   name="end_date" value="{{ end_date }}">
+                   name="end_date" value="{{ end_date }}" min="{{ end_date_min }}" max="{{ today }}"
+                   required aria-describedby="date-help">
         </div>
 
         <div class="form-group">
@@ -41,9 +62,15 @@
         </div>
 
         <div class="form-group">
-            <label for="tag">Malware Tag</label>
-            <select id="tag" name="tag">
-                <option value="all">All Tags</option>
+            <label for="tag">Malware tag</label>
+            <input type="search" id="tag-search" aria-label="Search URLhaus tags"
+                   aria-controls="tag" aria-describedby="tag-help"
+                   placeholder="Search tags" autocomplete="off" hidden>
+            <select id="tag" name="tag" aria-describedby="tag-help">
+                <option value="all">All tags</option>
+                {% if selected_tag != "all" and selected_tag not in tags %}
+                <option value="{{ selected_tag }}" selected>{{ selected_tag }} (unavailable)</option>
+                {% endif %}
                 {% for tag in tags %}
                 <option value="{{ tag }}"
                     {% if selected_tag == tag %}selected{% endif %}>
@@ -51,18 +78,28 @@
                 </option>
                 {% endfor %}
             </select>
+            <small id="tag-help" role="status"></small>
         </div>
 
-        <button type="submit">Fetch URLs</button>
+            </div>
+        </div>
     </form>
+    {% else %}
+        <a href="{{ url_for('fetch_page', start_date=start_date, end_date=end_date, threat=selected_threat, tag=selected_tag, q=query) }}">Back to search</a>
+    {% endif %}
 
     {% if error %}
         <p class="error">{{ error }}</p>
     {% endif %}
 
     {% if total_records is not none %}
-    <section class="results">
-        <h2>Fetch Results</h2>
+    <section class="results" id="preview">
+        <div class="preview-header">
+        <h2>{{ 'Data preview' if saved or query else 'Latest records' }}</h2>
+        {% if saved %}
+        <a href="{{ url_for('results_page') }}" class="results-link">View Results</a>
+        {% endif %}
+        </div>
         <p><strong>{{ total_records }}</strong> matching records found.</p>
 
         {% if records %}
@@ -70,37 +107,46 @@
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Date Added</th>
+                        <th>Date Added (UTC)</th>
                         <th>Defanged URL</th>
                         <th>Status</th>
                         <th>Threat</th>
                         <th>Tags</th>
+                        <th>Host</th>
+                        <th>Country</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for record in records %}
                     <tr>
-                        <td>{{ record.id }}</td>
                         <td>{{ record.dateadded }}</td>
                         <td class="url-cell">{{ record.defanged_url }}</td>
                         <td>{{ record.url_status }}</td>
                         <td>{{ record.threat }}</td>
-                        <td>{{ record.tags }}</td>
+                        <td class="wrap-cell">{{ record.tags or '—' }}</td>
+                        <td class="wrap-cell">{{ record.hostname | replace('.', '[.]') if record.hostname else '—' }}</td>
+                        <td>{{ record.country }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <nav class="preview-pagination" aria-label="Preview pages">
+            {% if page > 1 %}
+                <a href="{{ url_for('fetch_page', page=page - 1, saved=1 if saved else 0, start_date=start_date, end_date=end_date, threat=selected_threat, tag=selected_tag, q=query, _anchor='preview') }}">Previous</a>
+            {% endif %}
+            <span>{{ first_record }}–{{ last_record }} of {{ total_records }} · Page {{ page }} of {{ page_count }}</span>
+            {% if page < page_count %}
+                <a href="{{ url_for('fetch_page', page=page + 1, saved=1 if saved else 0, start_date=start_date, end_date=end_date, threat=selected_threat, tag=selected_tag, q=query, _anchor='preview') }}">Next</a>
+            {% endif %}
+        </nav>
         {% else %}
             <p>No records match your selected filters.</p>
         {% endif %}
 
-        <a href="{{ url_for('results_page') }}" class="results-link">
-            View Results
-        </a>
     </section>
     {% endif %}
+    <p><small><a href="https://db-ip.com">IP Geolocation by DB-IP</a></small></p>
 </main>
 
 </body>
