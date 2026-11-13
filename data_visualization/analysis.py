@@ -51,3 +51,36 @@ def count_by_tag(records):
     # explode preserves row indexes, allowing duplicate tags per URL to be removed.
     tagged = tags.rename("tag").reset_index().drop_duplicates(["index", "tag"])
     return count_by_category(tagged, "tag")
+
+
+def count_daily_additions(records):
+    """Count reported additions per UTC day and threat, including zero-count days.
+
+    Invalid dates are excluded here but remain in the other summaries.
+    The date represents reporting to URLhaus, not the start of an attack.
+    """
+    dated = records.dropna(subset=["dateadded"]).copy()
+    dated["date"] = dated["dateadded"].dt.floor("D")
+    if dated.empty:
+        return pd.DataFrame(columns=["date", "threat", "url_count"])
+
+    days = pd.date_range(dated["date"].min(), dated["date"].max(), freq="D")
+    groups = pd.MultiIndex.from_product(
+        [days, sorted(dated["threat"].unique())], names=["date", "threat"]
+    )
+    counts = dated.groupby(["date", "threat"]).size()
+    return counts.reindex(groups, fill_value=0).reset_index(name="url_count")
+
+
+def summarize_status(records):
+    """Calculate offline percentage among records with a known status only."""
+    online = int(records["url_status"].eq("online").sum())
+    offline = int(records["url_status"].eq("offline").sum())
+    known = online + offline
+    return {
+        "total": len(records),
+        "online": online,
+        "offline": offline,
+        "unknown": len(records) - known,
+        "offline_percentage": 100 * offline / known if known else None,
+    }
