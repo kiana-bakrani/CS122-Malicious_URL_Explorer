@@ -5,7 +5,7 @@ import pytest
 
 from data_visualization.analysis import (
     prepare_records, count_by_category, count_by_tag,
-    count_daily_additions, count_daily_totals, summarize_status,
+    count_daily_additions, count_daily_totals, calculate_daily_trend, summarize_status,
 )
 
 
@@ -70,3 +70,34 @@ def test_daily_totals_handle_no_valid_dates():
         daily = count_daily_totals(selection)
         assert daily.empty
         assert daily.columns.tolist() == ["date", "url_count"]
+
+
+@pytest.mark.parametrize("counts, expected_slope", [
+    ([1, 3, 5], 2), ([5, 3, 1], -2), ([2, 2, 2], 0), ([2, 0, 6], 2),
+])
+def test_linear_trend_matches_known_counts(counts, expected_slope):
+    dates = []
+    for day, count in enumerate(counts, start=1):
+        dates.extend([f"2026-11-{day:02d}"] * count)
+    records = prepare_records(pd.DataFrame({
+        "dateadded": dates, "url_status": ["online"] * len(dates),
+    }))
+    result = calculate_daily_trend(records)
+    assert result["slope"] == pytest.approx(expected_slope, abs=1e-10)
+    assert result["daily"]["url_count"].tolist() == counts
+    fitted = result["daily"]["trend_count"]
+    assert fitted.iloc[1] - fitted.iloc[0] == pytest.approx(expected_slope, abs=1e-10)
+    if counts == [1, 3, 5]:
+        assert result["intercept"] == pytest.approx(1)
+        assert fitted.tolist() == pytest.approx(counts)
+
+
+@pytest.mark.parametrize("dates", [[], ["2026-11-01"], [None]])
+def test_linear_trend_requires_two_reporting_days(dates):
+    records = prepare_records(pd.DataFrame({
+        "dateadded": dates, "url_status": ["online"] * len(dates),
+    }))
+    result = calculate_daily_trend(records)
+    assert result["slope"] is None
+    assert result["intercept"] is None
+    assert result["daily"]["trend_count"].isna().all()

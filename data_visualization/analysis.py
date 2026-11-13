@@ -1,5 +1,6 @@
 """Author #2: pandas analysis of the records collected by Author #1."""
 
+import numpy as np
 import pandas as pd
 
 
@@ -82,6 +83,27 @@ def count_daily_totals(records):
     if daily.empty:
         return pd.DataFrame(columns=["date", "url_count"])
     return daily.groupby("date", as_index=False)["url_count"].sum()
+
+
+def calculate_daily_trend(records):
+    """Fit a straight line to daily totals, following CS 122 Lecture 13-1.
+
+    x is days since the first reporting date and y is reported URLs per day.
+    The slope describes change in daily counts per elapsed day, not a forecast
+    or a measure of all attacks. Fewer than two days cannot define a trend.
+    Returns the daily table (including fitted values), slope, and intercept.
+    """
+    daily = count_daily_totals(records)
+    daily["trend_count"] = np.nan
+    if len(daily) < 2:
+        return {"daily": daily, "slope": None, "intercept": None}
+
+    days = (daily["date"] - daily["date"].iloc[0]).dt.days
+    coefficients = np.polyfit(days, daily["url_count"], 1)
+    slope = float(coefficients[0])
+    intercept = float(coefficients[1])
+    daily["trend_count"] = slope * days + intercept
+    return {"daily": daily, "slope": slope, "intercept": intercept}
 
 
 def summarize_status(records):

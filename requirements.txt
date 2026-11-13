@@ -2,5 +2,6 @@ Flask
 requests
 python-dotenv
 pandas
+numpy
 dnspython
 maxminddb
