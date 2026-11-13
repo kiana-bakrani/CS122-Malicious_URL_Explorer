@@ -1,6 +1,12 @@
 """Author #2: Matplotlib figures for the Results page and plot downloads."""
 
+import json
+from pathlib import Path
+
+import numpy as np
 import matplotlib.dates as mdates
+from matplotlib.collections import PolyCollection
+from matplotlib.colors import Normalize
 from matplotlib.figure import Figure
 
 from data_visualization.analysis import calculate_daily_trend
@@ -58,4 +64,64 @@ def create_timeseries_chart(records):
         f"{start} to {end} UTC | Source: URLhaus | Reporting dates, not attack start dates; trend is not a forecast.",
         fontsize=8,
     )
+    return fig
+
+
+def create_country_map(records, boundary_path=None):
+    """Color Natural Earth country polygons using prepared hosting-country codes.
+
+    Boundary data is downloaded separately into data/cache, not stored in Git.
+    Unknown/unmapped records are reported separately, never assigned a location.
+    """
+    if boundary_path is None:
+        boundary_path = Path(__file__).resolve().parent.parent / "data/cache/countries.geojson"
+    fig = Figure(figsize=(10, 5.5), layout="constrained")
+    ax = fig.subplots()
+    ax.set_title("Reported URLs by hosting country", loc="left", fontweight="bold")
+    if not Path(boundary_path).is_file():
+        ax.text(0.5, 0.5, "Map boundaries missing. Follow the README map setup.",
+                transform=ax.transAxes, ha="center", va="center")
+        ax.set_axis_off()
+        return fig
+
+    with Path(boundary_path).open(encoding="utf-8") as source:
+        features = json.load(source)["features"]
+    counts = records["country"].astype(str).str.strip().str.upper().value_counts()
+    polygons = []
+    values = []
+    mapped_codes = set()
+    for feature in features:
+        properties = feature["properties"]
+        code = properties.get("ISO_A2_EH", properties.get("ISO_A2", ""))
+        if len(code) != 2:
+            code = ""
+        if code:
+            mapped_codes.add(code)
+        geometry = feature["geometry"]
+        if geometry["type"] == "Polygon":
+            parts = [geometry["coordinates"]]
+        elif geometry["type"] == "MultiPolygon":
+            parts = geometry["coordinates"]
+        else:
+            continue
+        for part in parts:
+            polygons.append(part[0])
+            values.append(int(counts.get(code, 0)))
+
+    collection = PolyCollection(polygons, edgecolors="gray", linewidths=0.3,
+                                cmap="Blues", norm=Normalize(0, max(values + [1])))
+    collection.set_array(np.asarray(values))
+    ax.add_collection(collection)
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-60, 90)
+    ax.set_aspect("equal")
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    fig.colorbar(collection, ax=ax, shrink=0.7, label="Reported URL count")
+    mapped = int(counts[counts.index.isin(mapped_codes)].sum())
+    fig.text(0.01, -0.03,
+             f"Mapped: {mapped} | Unknown/unmapped: {len(records) - mapped} | "
+             "Hosting location, not attacker origin.\n"
+             "Sources: URLhaus; Natural Earth (public domain); IP Geolocation by DB-IP (db-ip.com).",
+             fontsize=8)
     return fig

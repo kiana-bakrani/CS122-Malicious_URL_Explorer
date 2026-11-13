@@ -67,6 +67,24 @@ Project code uses the [BSD 3-Clause License](LICENSE). URLhaus data remains subj
 
 ## Country lookup setup
 
+### Map boundary setup (Author #2)
+
+The Matplotlib country map reads Natural Earth's public-domain 1:110m country
+boundaries from `data/cache/countries.geojson`. From the project directory, run:
+
+```bash
+mkdir -p data/cache
+curl --fail --location https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson -o data/cache/countries.geojson
+```
+
+This boundary dataset is excluded from Git along with the other downloaded data.
+It is a simplified world map; small territories may not appear, so records with
+unmapped codes are reported separately. Chart counts come from the filtered
+URLhaus records, not from the boundary file. The Matplotlib map is a static figure
+that will be displayed on the Results page; it replaces the earlier Plotly map plan.
+
+### Hosting-country lookup (Author #1)
+
 Install the packages in `requirements.txt`. Download and decompress the [DB-IP IP to Country Lite MMDB](https://db-ip.com/db/download/ip-to-country-lite) into `data/cache/dbip-country-lite.mmdb`.
 
 Each Search submission adds `country` to `data/filtered_urls.csv`. It contains a two-letter country code such as `US`, or `Unknown` when a country cannot be determined within the lookup time limit. Country estimates describe the resolved infrastructure. Successful lookups are cached for 24 hours in `data/cache/country_cache.sqlite3`. Replace the MMDB with a newer release to refresh the geolocation data.
