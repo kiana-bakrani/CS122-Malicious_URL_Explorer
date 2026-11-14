@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results | Malicious URL Explorer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='results.css') }}">
+</head>
+<body>
+<main class="container">
+    <nav class="results-navigation" aria-label="Project pages">
+        <a href="{{ url_for('fetch_page') }}">Fetch data</a>
+        <span aria-current="page">Results</span>
+    </nav>
+    <header>
+        <p class="page-eyebrow">Malicious URL Explorer</p>
+        <h1>Analysis results</h1>
+        <p>Explore reporting patterns and hosting locations in your saved URLhaus selection.</p>
+    </header>
+
+    {% if records is none %}
+    <section class="results-panel" aria-labelledby="dataset-heading">
+        <h2 id="dataset-heading">Fetch data first</h2>
+        <p>No saved selection is available. Use Search on the Fetch page to collect and save records for analysis.</p>
+        <a class="results-link" href="{{ url_for('fetch_page') }}">Go to Fetch page</a>
+    </section>
+    {% elif records.empty %}
+    <section class="results-panel" aria-labelledby="dataset-heading">
+        <h2 id="dataset-heading">Your saved selection is empty</h2>
+        <p>Return to the Fetch page and broaden your date range or filters, then search again.</p>
+        <a class="results-link" href="{{ url_for('fetch_page') }}">Change search</a>
+    </section>
+    {% else %}
+    <section class="results-panel" aria-labelledby="dataset-heading">
+        <h2 id="dataset-heading">Saved selection</h2>
+        <p><strong>{{ records | length }}</strong> records from your latest successful Fetch search.</p>
+        <a href="{{ url_for('fetch_page', saved=1) }}">Review saved records</a>
+    </section>
+
+    <section class="results-panel" aria-labelledby="summary-heading">
+        <h2 id="summary-heading">Summary statistics</h2>
+        <p class="section-placeholder">Online, offline, and unknown-status counts will appear here when statistics are connected.</p>
+    </section>
+    <div class="chart-sections">
+        <section class="results-panel" aria-labelledby="time-heading">
+            <h2 id="time-heading">Daily additions</h2>
+            <p>Daily reported URL counts and their fitted linear trend.</p>
+            <p class="section-placeholder">The Matplotlib time-series chart will be connected in a later section.</p>
+        </section>
+        <section class="results-panel" aria-labelledby="map-heading">
+            <h2 id="map-heading">Hosting countries</h2>
+            <p>Reported URLs grouped by hosting country, with unknown locations counted separately.</p>
+            <p class="section-placeholder">The Matplotlib country map will be connected in a later section.</p>
+        </section>
+    </div>
+    <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
+    {% endif %}
+
+    <footer class="results-footer">
+        <small>Data: <a href="https://urlhaus.abuse.ch/">URLhaus</a> ·
+            <a href="https://db-ip.com">IP Geolocation by DB-IP</a> ·
+            Map boundaries: Natural Earth</small>
+    </footer>
+</main>
+</body>
+</html>

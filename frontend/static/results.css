@@ -1,0 +1,56 @@
+/* Author #2: Results layout; shared colors and controls come from style.css. */
+.results-navigation {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.results-navigation [aria-current="page"] {
+    font-weight: bold;
+    border-bottom: 2px solid #2457a7;
+    padding-bottom: 6px;
+}
+
+.page-eyebrow {
+    color: #2457a7;
+    font-weight: bold;
+}
+
+.results-panel {
+    background: white;
+    border: 1px solid #e5e9f0;
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 24px;
+}
+
+.results-panel h2 {
+    margin-top: 0;
+    font-size: 1.25rem;
+}
+
+.chart-sections {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.section-placeholder {
+    color: #526078;
+    background: #f5f7fb;
+    padding: 20px;
+    border-radius: 6px;
+    line-height: 1.6;
+}
+
+.results-note, .results-footer {
+    margin-top: 24px;
+    line-height: 1.6;
+}
+
+@media (max-width: 800px) {
+    .chart-sections {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
