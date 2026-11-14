@@ -143,6 +143,9 @@
         {% endif %}
         <img class="results-chart" src="data:image/png;base64,{{ chart_image }}"
              alt="{{ 'World map of reported URL counts by hosting country' if selected_view == 'map' else 'Daily reported URL counts with a fitted linear trend' }}">
+        <a class="results-link save-plot" href="data:image/png;base64,{{ chart_image }}"
+           download="urlhaus-{{ selected_view }}.png">Save Plot (PNG)</a>
+        <p class="download-help">Downloads the chart currently displayed above, including your applied filters.</p>
         <p>The chart uses the same country, threat, tag, and status filters as the statistics above.</p>
     </section>
     <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>

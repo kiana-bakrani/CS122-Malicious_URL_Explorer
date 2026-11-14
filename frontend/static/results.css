@@ -113,6 +113,15 @@
     height: auto;
 }
 
+.save-plot {
+    margin-top: 16px;
+}
+
+.download-help {
+    color: #526078;
+    font-size: 0.9rem;
+}
+
 .summary-card {
     background: #f5f7fb;
     border-radius: 8px;

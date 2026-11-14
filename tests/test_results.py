@@ -37,6 +37,13 @@ def test_selected_chart_uses_the_same_filtered_records_as_statistics(monkeypatch
     assert 'value="mirai" checked' in html
     encoded = re.search(r'src="data:image/png;base64,([^"]+)"', html).group(1)
     assert base64.b64decode(encoded).startswith(b"\x89PNG\r\n\x1a\n")
+    # Download the existing image, so data changes cannot alter the saved chart.
+    download = re.search(
+        r'href="data:image/png;base64,([^"]+)"\s+download="([^"]+)"', html
+    )
+    assert download is not None
+    assert download.group(1) == encoded
+    assert download.group(2) == f"urlhaus-{view}.png"
     assert "connected in a later section" not in html
 
 
@@ -47,6 +54,7 @@ def test_empty_filter_selection_does_not_render_chart(monkeypatch):
     html = web.app.test_client().get("/results?country=DE&view=map").get_data(as_text=True)
     assert "No records match these filters" in html
     assert "data:image/png" not in html
+    assert "Save Plot" not in html
     assert 'value="map" checked' in html
 
 
