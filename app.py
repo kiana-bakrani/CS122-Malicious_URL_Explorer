@@ -6,6 +6,7 @@ from backend.country_lookup import add_countries
 from backend.data_pipeline import run_pipeline, get_cleaned_data
 from backend.data_storage import DATA_DIR, load_filtered_data
 from backend.filters import filter_by_date, filter_by_tag, filter_by_threat
+from data_visualization.analysis import prepare_records, summarize_status
 
 app = Flask(
     __name__,
@@ -181,11 +182,15 @@ def fetch_page():
 
 @app.route("/results")
 def results_page():
+    summary = None
     try:
         records = load_filtered_data()
+        if not records.empty:
+            records = prepare_records(records)
+            summary = summarize_status(records)
     except FileNotFoundError:
         records = None
-    return render_template("results.html", records=records)
+    return render_template("results.html", records=records, summary=summary)
 
 
 if __name__ == "__main__":

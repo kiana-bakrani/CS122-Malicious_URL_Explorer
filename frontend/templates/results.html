@@ -40,7 +40,32 @@
 
     <section class="results-panel" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary statistics</h2>
-        <p class="section-placeholder">Online, offline, and unknown-status counts will appear here when statistics are connected.</p>
+        <dl class="summary-grid">
+            <div class="summary-card">
+                <dt>Total records</dt>
+                <dd>{{ summary.total }}</dd>
+            </div>
+            <div class="summary-card">
+                <dt>Online</dt>
+                <dd>{{ summary.online }}</dd>
+            </div>
+            <div class="summary-card">
+                <dt>Offline</dt>
+                <dd>{{ summary.offline }}</dd>
+            </div>
+            <div class="summary-card">
+                <dt>Unknown status</dt>
+                <dd>{{ summary.unknown }}</dd>
+            </div>
+            <div class="summary-card">
+                <dt>Offline percentage</dt>
+                <dd>{% if summary.offline_percentage is not none %}{{ '%.1f' | format(summary.offline_percentage) }}%{% else %}N/A{% endif %}</dd>
+            </div>
+        </dl>
+        <p class="results-note">Offline percentage = offline ÷ (online + offline) × 100.
+            Unknown statuses are excluded from this percentage.
+            {% if summary.offline_percentage is none %}No records have a known online/offline status.{% endif %}
+            Counts describe the saved snapshot, not live availability.</p>
     </section>
     <div class="chart-sections">
         <section class="results-panel" aria-labelledby="time-heading">

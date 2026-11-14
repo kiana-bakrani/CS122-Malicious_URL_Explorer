@@ -35,6 +35,30 @@
     gap: 24px;
 }
 
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 0;
+}
+
+.summary-card {
+    background: #f5f7fb;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.summary-card dt {
+    color: #526078;
+    font-size: 0.9rem;
+}
+
+.summary-card dd {
+    margin: 12px 0 0;
+    font-size: 1.75rem;
+    font-weight: bold;
+}
+
 .section-placeholder {
     color: #526078;
     background: #f5f7fb;
