@@ -87,6 +87,32 @@
     width: auto;
 }
 
+.chart-choice {
+    flex-basis: 100%;
+    border: 1px solid #ccd3df;
+    border-radius: 6px;
+    padding: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.chart-choice label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.chart-choice input {
+    width: auto;
+}
+
+.results-chart {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
 .summary-card {
     background: #f5f7fb;
     border-radius: 8px;

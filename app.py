@@ -1,5 +1,7 @@
 from collections import Counter
+import base64
 from datetime import date, datetime, timedelta, timezone
+from io import BytesIO
 
 from flask import Flask, jsonify, render_template, request
 from backend.country_lookup import add_countries
@@ -7,6 +9,7 @@ from backend.data_pipeline import run_pipeline, get_cleaned_data
 from backend.data_storage import DATA_DIR, load_filtered_data
 from backend.filters import filter_by_date, filter_by_tag, filter_by_threat
 from data_visualization.analysis import prepare_records, summarize_status
+from data_visualization.charts import create_timeseries_chart, create_country_map
 
 app = Flask(
     __name__,
@@ -183,6 +186,10 @@ def fetch_page():
 @app.route("/results")
 def results_page():
     summary = None
+    chart_image = None
+    selected_view = request.args.get("view", "timeseries")
+    if selected_view not in ["timeseries", "map"]:
+        selected_view = "timeseries"
     countries = []
     threats = []
     tags = []
@@ -212,6 +219,12 @@ def results_page():
             if selected_status != "all":
                 records = records[records["url_status"] == selected_status].copy()
             summary = summarize_status(records)
+            if not records.empty:
+                figure = create_country_map(records) if selected_view == "map" else create_timeseries_chart(records)
+                image = BytesIO()
+                figure.savefig(image, format="png", dpi=120, bbox_inches="tight")
+                chart_image = base64.b64encode(image.getvalue()).decode("ascii")
+                figure.clear()
     except FileNotFoundError:
         records = None
     return render_template(
@@ -219,6 +232,7 @@ def results_page():
         countries=countries, selected_country=selected_country, saved_count=saved_count,
         threats=threats, tags=tags, selected_threat=selected_threat,
         selected_tags=selected_tags, selected_status=selected_status,
+        selected_view=selected_view, chart_image=chart_image,
     )
 
 

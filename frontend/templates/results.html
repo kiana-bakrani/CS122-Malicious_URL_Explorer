@@ -87,6 +87,11 @@
             </div>
             {% if not tags %}<p>No malware tags are available in this saved selection.</p>{% endif %}
         </fieldset>
+        <fieldset class="chart-choice">
+            <legend>Chart</legend>
+            <label><input type="radio" name="view" value="timeseries"{% if selected_view == 'timeseries' %} checked{% endif %}> Time series — Daily additions</label>
+            <label><input type="radio" name="view" value="map"{% if selected_view == 'map' %} checked{% endif %}> Country map — Hosting countries</label>
+        </fieldset>
         <button type="submit">Apply filters</button>
         <a href="{{ url_for('results_page') }}">Reset</a>
         <p class="filter-description">Filters update this analysis without changing your saved records.</p>
@@ -129,18 +134,17 @@
             {% if summary.offline_percentage is none %}No records have a known online/offline status.{% endif %}
             Counts describe the saved snapshot, not live availability.</p>
     </section>
-    <div class="chart-sections">
-        <section class="results-panel" aria-labelledby="time-heading">
-            <h2 id="time-heading">Daily additions</h2>
-            <p>Daily reported URL counts and their fitted linear trend.</p>
-            <p class="section-placeholder">The Matplotlib time-series chart will be connected in a later section.</p>
-        </section>
-        <section class="results-panel" aria-labelledby="map-heading">
-            <h2 id="map-heading">Hosting countries</h2>
-            <p>Reported URLs grouped by hosting country, with unknown locations counted separately.</p>
-            <p class="section-placeholder">The Matplotlib country map will be connected in a later section.</p>
-        </section>
-    </div>
+    <section class="results-panel" aria-labelledby="chart-heading">
+        <h2 id="chart-heading">{{ 'Hosting countries' if selected_view == 'map' else 'Daily additions' }}</h2>
+        {% if selected_view == 'map' %}
+        <p>Reported URLs grouped by hosting country. Unknown and unmapped locations are counted separately below the map.</p>
+        {% else %}
+        <p>Daily reported URL counts and their fitted linear trend for the current selection.</p>
+        {% endif %}
+        <img class="results-chart" src="data:image/png;base64,{{ chart_image }}"
+             alt="{{ 'World map of reported URL counts by hosting country' if selected_view == 'map' else 'Daily reported URL counts with a fitted linear trend' }}">
+        <p>The chart uses the same country, threat, tag, and status filters as the statistics above.</p>
+    </section>
     <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
     {% endif %}
     {% endif %}
