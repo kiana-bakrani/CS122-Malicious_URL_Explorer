@@ -42,6 +42,24 @@
     margin-bottom: 0;
 }
 
+.country-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 16px;
+}
+
+.country-filter .form-group {
+    flex: 1 1 200px;
+    max-width: 360px;
+}
+
+.country-filter .filter-description {
+    flex-basis: 100%;
+    margin: 0;
+    color: #526078;
+}
+
 .summary-card {
     background: #f5f7fb;
     border-radius: 8px;

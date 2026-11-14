@@ -25,7 +25,7 @@
         <p>No saved selection is available. Use Search on the Fetch page to collect and save records for analysis.</p>
         <a class="results-link" href="{{ url_for('fetch_page') }}">Go to Fetch page</a>
     </section>
-    {% elif records.empty %}
+    {% elif saved_count == 0 %}
     <section class="results-panel" aria-labelledby="dataset-heading">
         <h2 id="dataset-heading">Your saved selection is empty</h2>
         <p>Return to the Fetch page and broaden your date range or filters, then search again.</p>
@@ -34,12 +34,37 @@
     {% else %}
     <section class="results-panel" aria-labelledby="dataset-heading">
         <h2 id="dataset-heading">Saved selection</h2>
-        <p><strong>{{ records | length }}</strong> records from your latest successful Fetch search.</p>
+        <p><strong>{{ saved_count }}</strong> records from your latest successful Fetch search.</p>
         <a href="{{ url_for('fetch_page', saved=1) }}">Review saved records</a>
     </section>
 
+    <form method="GET" action="{{ url_for('results_page') }}" class="results-panel country-filter">
+        <div class="form-group">
+            <label for="results-country">Hosting country</label>
+            <select id="results-country" name="country">
+                <option value="all"{% if selected_country == 'all' %} selected{% endif %}>All countries</option>
+                {% if selected_country != 'all' and selected_country not in countries %}
+                <option value="{{ selected_country }}" selected>{{ selected_country }} (unavailable)</option>
+                {% endif %}
+                {% for country in countries %}
+                <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Apply country</button>
+        <a href="{{ url_for('results_page') }}">Reset</a>
+        <p class="filter-description">Filters update this analysis without changing your saved records.</p>
+    </form>
+
+    {% if records.empty %}
+    <section class="results-panel" role="status">
+        <h2>No records match this country</h2>
+        <p>Select another country or reset to All countries.</p>
+    </section>
+    {% else %}
     <section class="results-panel" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary statistics</h2>
+        <p>Showing {{ records | length }} records · {{ 'All countries' if selected_country == 'all' else selected_country }}</p>
         <dl class="summary-grid">
             <div class="summary-card">
                 <dt>Total records</dt>
@@ -80,6 +105,7 @@
         </section>
     </div>
     <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
+    {% endif %}
     {% endif %}
 
     <footer class="results-footer">

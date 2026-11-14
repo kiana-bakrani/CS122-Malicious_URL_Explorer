@@ -183,14 +183,24 @@ def fetch_page():
 @app.route("/results")
 def results_page():
     summary = None
+    countries = []
+    saved_count = 0
+    selected_country = request.args.get("country", "all").strip() or "all"
     try:
         records = load_filtered_data()
         if not records.empty:
             records = prepare_records(records)
+            saved_count = len(records)
+            countries = sorted(records["country"].unique().tolist())
+            if selected_country != "all":
+                records = records[records["country"] == selected_country].copy()
             summary = summarize_status(records)
     except FileNotFoundError:
         records = None
-    return render_template("results.html", records=records, summary=summary)
+    return render_template(
+        "results.html", records=records, summary=summary,
+        countries=countries, selected_country=selected_country, saved_count=saved_count,
+    )
 
 
 if __name__ == "__main__":
