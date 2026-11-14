@@ -184,22 +184,41 @@ def fetch_page():
 def results_page():
     summary = None
     countries = []
+    threats = []
+    tags = []
     saved_count = 0
     selected_country = request.args.get("country", "all").strip() or "all"
+    selected_threat = request.args.get("threat", "all").strip() or "all"
+    selected_status = request.args.get("status", "all").strip() or "all"
+    selected_tags = sorted({tag.strip().lower() for tag in request.args.getlist("tag") if tag.strip()})
     try:
         records = load_filtered_data()
         if not records.empty:
             records = prepare_records(records)
             saved_count = len(records)
             countries = sorted(records["country"].unique().tolist())
+            threats = sorted(records["threat"].unique().tolist())
+            tags = ranked_tags(records)
             if selected_country != "all":
                 records = records[records["country"] == selected_country].copy()
+            records = filter_by_threat(records, selected_threat)
+            if selected_tags:
+                matches = records["tags"].apply(
+                    lambda value: bool(
+                        {tag.strip().lower() for tag in str(value).split(",")} & set(selected_tags)
+                    )
+                )
+                records = records[matches].copy()
+            if selected_status != "all":
+                records = records[records["url_status"] == selected_status].copy()
             summary = summarize_status(records)
     except FileNotFoundError:
         records = None
     return render_template(
         "results.html", records=records, summary=summary,
         countries=countries, selected_country=selected_country, saved_count=saved_count,
+        threats=threats, tags=tags, selected_threat=selected_threat,
+        selected_tags=selected_tags, selected_status=selected_status,
     )
 
 

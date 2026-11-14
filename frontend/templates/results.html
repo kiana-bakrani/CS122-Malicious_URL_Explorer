@@ -51,20 +51,57 @@
                 {% endfor %}
             </select>
         </div>
-        <button type="submit">Apply country</button>
+        <div class="form-group">
+            <label for="results-threat">Threat category</label>
+            <select id="results-threat" name="threat">
+                <option value="all"{% if selected_threat == 'all' %} selected{% endif %}>All threats</option>
+                {% for threat in threats %}
+                <option value="{{ threat }}"{% if threat == selected_threat %} selected{% endif %}>{{ threat }}</option>
+                {% endfor %}
+                {% if selected_threat != 'all' and selected_threat not in threats %}
+                <option value="{{ selected_threat }}" selected>{{ selected_threat }} (unavailable)</option>
+                {% endif %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="results-status">URL status</label>
+            <select id="results-status" name="status">
+                {% for value, label in [('all', 'All statuses'), ('online', 'Online'), ('offline', 'Offline'), ('unknown', 'Unknown')] %}
+                <option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+                {% if selected_status not in ['all', 'online', 'offline', 'unknown'] %}
+                <option value="{{ selected_status }}" selected>{{ selected_status }} (unavailable)</option>
+                {% endif %}
+            </select>
+        </div>
+        <fieldset class="tag-filter">
+            <legend>Malware tags</legend>
+            <p>Select any matching tag. Leave all unchecked to include every tag.</p>
+            <div class="tag-options">
+                {% for tag in tags %}
+                <label><input type="checkbox" name="tag" value="{{ tag }}"{% if tag in selected_tags %} checked{% endif %}> {{ tag }}</label>
+                {% endfor %}
+                {% for tag in selected_tags if tag not in tags %}
+                <label><input type="checkbox" name="tag" value="{{ tag }}" checked> {{ tag }} (unavailable)</label>
+                {% endfor %}
+            </div>
+            {% if not tags %}<p>No malware tags are available in this saved selection.</p>{% endif %}
+        </fieldset>
+        <button type="submit">Apply filters</button>
         <a href="{{ url_for('results_page') }}">Reset</a>
         <p class="filter-description">Filters update this analysis without changing your saved records.</p>
     </form>
 
     {% if records.empty %}
     <section class="results-panel" role="status">
-        <h2>No records match this country</h2>
-        <p>Select another country or reset to All countries.</p>
+        <h2>No records match these filters</h2>
+        <p>Change the country, threat, tags, or status, or reset all filters.</p>
     </section>
     {% else %}
     <section class="results-panel" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary statistics</h2>
         <p>Showing {{ records | length }} records · {{ 'All countries' if selected_country == 'all' else selected_country }}</p>
+        <p>Threat: {{ selected_threat }} · Status: {{ selected_status }} · Tags: {{ selected_tags | join(', ') if selected_tags else 'all' }}</p>
         <dl class="summary-grid">
             <div class="summary-card">
                 <dt>Total records</dt>

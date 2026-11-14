@@ -91,8 +91,46 @@ def test_country_without_matches_keeps_dropdown_and_reset(monkeypatch):
         "dateadded": ["2026-11-01"], "country": ["US"], "url_status": ["online"],
     }))
     html = web.app.test_client().get("/results?country=ZZ").get_data(as_text=True)
-    assert "No records match this country" in html
+    assert "No records match these filters" in html
     assert 'value="US"' in html
     assert 'href="/results">Reset' in html
     assert "Your saved selection is empty" not in html
     assert "Summary statistics" not in html
+
+
+@pytest.mark.parametrize("query, expected_count", [
+    ({"threat": "category_a"}, 3),
+    ({"status": "offline"}, 2),
+    ({"status": "unknown"}, 1),
+    ({"tag": "mirai"}, 2),
+    ({"tag": ["mirai", "elf"]}, 3),
+    ({"country": "US", "threat": "category_a", "tag": "mirai", "status": "offline"}, 1),
+    ({"tag": "mir"}, 0),
+    ({"country": "DE", "status": "online"}, 0),
+    ({"status": "unavailable"}, 0),
+])
+def test_results_filters_combine_and_match_complete_tags(monkeypatch, query, expected_count):
+    records = pd.DataFrame({
+        "id": ["1", "2", "3", "4"],
+        "dateadded": ["2026-11-01"] * 4,
+        "country": ["US", "US", "DE", "DE"],
+        "threat": ["category_a", "category_a", "category_b", "category_a"],
+        "tags": ["Mirai, elf", " mirai ", "elf", None],
+        "url_status": ["online", "offline", "offline", None],
+    })
+    original = records.copy(deep=True)
+    monkeypatch.setattr(web, "load_filtered_data", lambda: records)
+    client = web.app.test_client()
+    response = client.get("/results", query_string=query)
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    if expected_count:
+        assert f"Showing {expected_count} records" in html
+    else:
+        assert "No records match these filters" in html
+    assert 'value="category_b"' in html  # Options remain available after filtering.
+    for tag in query.get("tag", []) if isinstance(query.get("tag"), list) else [query.get("tag")]:
+        if tag:
+            assert f'value="{tag}" checked' in html
+    assert "Showing 4 records" in client.get("/results").get_data(as_text=True)
+    pd.testing.assert_frame_equal(records, original)
