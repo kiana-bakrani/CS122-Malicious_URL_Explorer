@@ -3,13 +3,14 @@ import base64
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request, send_file
 from backend.country_lookup import add_countries
 from backend.data_pipeline import run_pipeline, get_cleaned_data
 from backend.data_storage import DATA_DIR, load_filtered_data
 from backend.filters import filter_by_date, filter_by_tag, filter_by_threat
 from data_visualization.analysis import prepare_records, summarize_status
 from data_visualization.charts import create_timeseries_chart, create_country_map
+from data_visualization.exports import build_summaries
 
 app = Flask(
     __name__,
@@ -183,6 +184,55 @@ def fetch_page():
     )
 
 
+def filter_results_records(records, country, threat, tags, status):
+    """Apply identical Results filters to the page and summary downloads."""
+    if country != "all":
+        records = records[records["country"] == country].copy()
+    records = filter_by_threat(records, threat)
+    if tags:
+        matches = records["tags"].apply(
+            lambda value: bool(
+                {tag.strip().lower() for tag in str(value).split(",")} & set(tags)
+            )
+        )
+        records = records[matches].copy()
+    if status != "all":
+        records = records[records["url_status"] == status].copy()
+    return records
+
+
+def results_filter_values():
+    """Read applied query parameters, including repeated malware tags."""
+    return {
+        "country": request.args.get("country", "all").strip() or "all",
+        "threat": request.args.get("threat", "all").strip() or "all",
+        "status": request.args.get("status", "all").strip() or "all",
+        "tags": sorted({tag.strip().lower() for tag in request.args.getlist("tag") if tag.strip()}),
+    }
+
+
+@app.get("/results/download/<summary_name>")
+def download_summary(summary_name):
+    names = ["by_country", "by_threat", "by_tag", "daily_additions", "status_summary"]
+    if summary_name not in names:
+        abort(404)
+    try:
+        records = load_filtered_data()
+    except FileNotFoundError:
+        abort(404, description="Fetch and save records before downloading summaries.")
+    if records.empty:
+        abort(400, description="The saved selection is empty.")
+    records = filter_results_records(prepare_records(records), **results_filter_values())
+    if records.empty:
+        abort(400, description="No records match the selected filters.")
+    summary = build_summaries(records)[summary_name]
+    content = BytesIO(summary.to_csv(index=False).encode("utf-8"))
+    return send_file(
+        content, mimetype="text/csv", as_attachment=True,
+        download_name=f"urlhaus-{summary_name}.csv", max_age=0,
+    )
+
+
 @app.route("/results")
 def results_page():
     summary = None
@@ -194,10 +244,11 @@ def results_page():
     threats = []
     tags = []
     saved_count = 0
-    selected_country = request.args.get("country", "all").strip() or "all"
-    selected_threat = request.args.get("threat", "all").strip() or "all"
-    selected_status = request.args.get("status", "all").strip() or "all"
-    selected_tags = sorted({tag.strip().lower() for tag in request.args.getlist("tag") if tag.strip()})
+    filters = results_filter_values()
+    selected_country = filters["country"]
+    selected_threat = filters["threat"]
+    selected_status = filters["status"]
+    selected_tags = filters["tags"]
     try:
         records = load_filtered_data()
         if not records.empty:
@@ -206,18 +257,7 @@ def results_page():
             countries = sorted(records["country"].unique().tolist())
             threats = sorted(records["threat"].unique().tolist())
             tags = ranked_tags(records)
-            if selected_country != "all":
-                records = records[records["country"] == selected_country].copy()
-            records = filter_by_threat(records, selected_threat)
-            if selected_tags:
-                matches = records["tags"].apply(
-                    lambda value: bool(
-                        {tag.strip().lower() for tag in str(value).split(",")} & set(selected_tags)
-                    )
-                )
-                records = records[matches].copy()
-            if selected_status != "all":
-                records = records[records["url_status"] == selected_status].copy()
+            records = filter_results_records(records, **filters)
             summary = summarize_status(records)
             if not records.empty:
                 figure = create_country_map(records) if selected_view == "map" else create_timeseries_chart(records)

@@ -148,6 +148,16 @@
         <p class="download-help">Downloads the chart currently displayed above, including your applied filters.</p>
         <p>The chart uses the same country, threat, tag, and status filters as the statistics above.</p>
     </section>
+    <section class="results-panel" aria-labelledby="exports-heading">
+        <h2 id="exports-heading">Download summary CSVs</h2>
+        <p>Each download uses the applied filters shown above. Files contain summary counts, not individual URLs.</p>
+        <ul class="summary-downloads">
+            {% for name, label in [('by_country', 'By country'), ('by_threat', 'By threat'), ('by_tag', 'By malware tag'), ('daily_additions', 'Daily additions'), ('status_summary', 'Status summary')] %}
+            <li><a href="{{ url_for('download_summary', summary_name=name, country=selected_country, threat=selected_threat, tag=selected_tags, status=selected_status) }}">{{ label }} (CSV)</a></li>
+            {% endfor %}
+        </ul>
+        <p class="download-help">Downloads read the latest saved selection. If a new Fetch search is saved, refresh Results before downloading. Tag groups can overlap; unavailable offline percentages are blank.</p>
+    </section>
     <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
     {% endif %}
     {% endif %}

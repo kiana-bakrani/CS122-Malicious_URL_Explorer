@@ -16,15 +16,10 @@ from data_visualization.analysis import (
 SUMMARY_DIR = Path(__file__).resolve().parent.parent / "data" / "summaries"
 
 
-def save_summary_csvs(df, output_dir=SUMMARY_DIR):
-    """Analyze a collected DataFrame and export five summaries.
-
-    Calling this again replaces the previous summaries with the current selection.
-    Returns the file paths so the Results page can report where they were saved.
-    Unknown offline percentages are saved as blank cells, rather than zero.
-    """
+def build_summaries(df):
+    """Build the same summary tables for local storage and browser downloads."""
     records = prepare_records(df)
-    summaries = {
+    return {
         "by_country": count_by_category(records, "country"),
         "by_threat": count_by_category(records, "threat"),
         "by_tag": count_by_tag(records),
@@ -32,6 +27,13 @@ def save_summary_csvs(df, output_dir=SUMMARY_DIR):
         "status_summary": pd.DataFrame([summarize_status(records)]),
     }
 
+
+def save_summary_csvs(df, output_dir=SUMMARY_DIR):
+    """Export five summaries, replacing previous files for the current selection.
+
+    Returns the saved paths. Unknown offline percentages become blank cells.
+    """
+    summaries = build_summaries(df)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = {}
