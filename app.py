@@ -240,6 +240,9 @@ def results_page():
     selected_view = request.args.get("view", "timeseries")
     if selected_view not in ["timeseries", "map"]:
         selected_view = "timeseries"
+    selected_group = request.args.get("group_by", "total")
+    if selected_group not in ["total", "threat", "tag"]:
+        selected_group = "total"
     countries = []
     threats = []
     tags = []
@@ -260,7 +263,12 @@ def results_page():
             records = filter_results_records(records, **filters)
             summary = summarize_status(records)
             if not records.empty:
-                figure = create_country_map(records) if selected_view == "map" else create_timeseries_chart(records)
+                if selected_view == "map":
+                    figure = create_country_map(records)
+                elif selected_group == "total":
+                    figure = create_timeseries_chart(records)
+                else:
+                    figure = create_timeseries_chart(records, selected_group, selected_tags)
                 image = BytesIO()
                 figure.savefig(image, format="png", dpi=120, bbox_inches="tight")
                 chart_image = base64.b64encode(image.getvalue()).decode("ascii")
@@ -273,6 +281,7 @@ def results_page():
         threats=threats, tags=tags, selected_threat=selected_threat,
         selected_tags=selected_tags, selected_status=selected_status,
         selected_view=selected_view, chart_image=chart_image,
+        selected_group=selected_group,
     )
 
 

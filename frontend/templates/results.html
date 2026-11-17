@@ -92,6 +92,15 @@
             <label><input type="radio" name="view" value="timeseries"{% if selected_view == 'timeseries' %} checked{% endif %}> Time series — Daily additions</label>
             <label><input type="radio" name="view" value="map"{% if selected_view == 'map' %} checked{% endif %}> Country map — Hosting countries</label>
         </fieldset>
+        <div class="form-group">
+            <label for="results-group">Group time-series lines by</label>
+            <select id="results-group" name="group_by">
+                {% for value, label in [('total', 'Total'), ('threat', 'Threat category'), ('tag', 'Malware tag')] %}
+                <option value="{{ value }}"{% if selected_group == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <small>Applies to the time series; the country map is unchanged.</small>
+        </div>
         <button type="submit">Apply filters</button>
         <a href="{{ url_for('results_page') }}">Reset</a>
         <p class="filter-description">Filters update this analysis without changing your saved records.</p>
@@ -139,7 +148,10 @@
         {% if selected_view == 'map' %}
         <p>Reported URLs grouped by hosting country. Unknown and unmapped locations are counted separately below the map.</p>
         {% else %}
-        <p>Daily reported URL counts and their fitted linear trend for the current selection.</p>
+        <p>Daily reported URL counts grouped by {{ selected_group }}, with the overall fitted trend for the current selection.</p>
+        {% if selected_group == 'tag' %}
+        <p>Tag lines can overlap. Selected tags are shown; if none are selected, up to 10 most frequent tags are shown. Untagged records are excluded from tag lines. The trend still describes all filtered records.</p>
+        {% endif %}
         {% endif %}
         <img class="results-chart" src="data:image/png;base64,{{ chart_image }}"
              alt="{{ 'World map of reported URL counts by hosting country' if selected_view == 'map' else 'Daily reported URL counts with a fitted linear trend' }}">

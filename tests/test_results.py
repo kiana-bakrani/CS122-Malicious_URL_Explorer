@@ -8,6 +8,29 @@ import re
 import app as web
 
 
+@pytest.mark.parametrize("group", ["threat", "tag"])
+def test_grouping_control_passes_applied_choice_to_chart(monkeypatch, group):
+    from matplotlib.figure import Figure
+    records = pd.DataFrame({
+        "dateadded": ["2026-11-01"], "tags": ["mirai,elf"],
+        "country": ["US"], "url_status": ["online"],
+    })
+    monkeypatch.setattr(web, "load_filtered_data", lambda: records)
+    received = []
+
+    def capture(selection, group_by, selected_tags):
+        received.append((len(selection), group_by, selected_tags))
+        return Figure()
+
+    monkeypatch.setattr(web, "create_timeseries_chart", capture)
+    html = web.app.test_client().get("/results", query_string={
+        "country": "US", "group_by": group, "tag": "mirai"
+    }).get_data(as_text=True)
+    assert received == [(1, group, ["mirai"])]
+    assert f'value="{group}" selected' in html
+    assert "Save Plot (PNG)" in html
+
+
 @pytest.mark.parametrize("view", ["timeseries", "map"])
 def test_selected_chart_uses_the_same_filtered_records_as_statistics(monkeypatch, view):
     records = pd.DataFrame({

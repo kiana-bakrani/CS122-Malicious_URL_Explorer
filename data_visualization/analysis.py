@@ -85,6 +85,36 @@ def count_daily_totals(records):
     return daily.groupby("date", as_index=False)["url_count"].sum()
 
 
+def count_daily_groups(records, group_by="threat", selected_tags=None):
+    """Count daily additions by threat or tag over a shared UTC date range.
+
+    Each tag counts once per record; one record may contribute to several tags.
+    Untagged records do not contribute to tag lines.
+    """
+    if group_by not in ["threat", "tag"]:
+        raise ValueError("Group by threat or tag.")
+    dated = records.dropna(subset=["dateadded"]).copy()
+    dated["date"] = dated["dateadded"].dt.floor("D")
+    if dated.empty:
+        return pd.DataFrame(columns=["date", "group", "url_count"])
+    days = pd.date_range(dated["date"].min(), dated["date"].max(), freq="D")
+    if group_by == "tag":
+        dated["group"] = dated["tags"].astype(str).str.split(",")
+        dated = dated.explode("group")
+        dated["group"] = dated["group"].str.strip().str.lower()
+        dated = dated[dated["group"].notna() & dated["group"].ne("")]
+        # Preserve the record index while removing repeated tags within a record.
+        dated = dated.reset_index().drop_duplicates(["index", "group"])
+        if selected_tags:
+            dated = dated[dated["group"].isin(selected_tags)]
+    else:
+        dated["group"] = dated["threat"]
+    groups = sorted(dated["group"].unique())
+    index = pd.MultiIndex.from_product([days, groups], names=["date", "group"])
+    counts = dated.groupby(["date", "group"]).size()
+    return counts.reindex(index, fill_value=0).reset_index(name="url_count")
+
+
 def calculate_daily_trend(records):
     """Fit a straight line to daily totals, following CS 122 Lecture 13-1.
 

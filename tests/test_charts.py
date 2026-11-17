@@ -53,3 +53,34 @@ def test_country_map_counts_multipolygons_once_and_reports_unmapped(tmp_path):
 def test_country_map_explains_missing_boundaries(tmp_path):
     fig = create_country_map(pd.DataFrame({"country": []}), tmp_path / "missing")
     assert "boundaries missing" in fig.axes[0].texts[0].get_text()
+
+
+@pytest.mark.parametrize("group_by, expected", [
+    ("threat", {"a": [2, 0, 0], "b": [0, 0, 1]}),
+    ("tag", {"elf": [1, 0, 1], "mirai": [1, 0, 0]}),
+])
+def test_grouped_lines_share_dates_and_do_not_duplicate_tags(group_by, expected):
+    records = prepare_records(pd.DataFrame({
+        "dateadded": ["2026-11-01", "2026-11-01", "2026-11-03"],
+        "threat": ["a", "a", "b"], "tags": ["mirai, mirai,elf", "", "elf"],
+        "url_status": ["online"] * 3,
+    }))
+    fig = create_timeseries_chart(records, group_by)
+    lines = {line.get_label(): list(line.get_ydata()) for line in fig.axes[0].lines}
+    for label, counts in expected.items():
+        assert lines[label] == counts
+    assert any(label.startswith("Overall linear trend") for label in lines)
+    if group_by == "tag":
+        assert "Tag groups overlap" in fig.texts[0].get_text()
+    fig.savefig(BytesIO(), format="png", bbox_inches="tight")
+
+
+def test_tag_chart_only_shows_selected_tag_lines():
+    records = prepare_records(pd.DataFrame({
+        "dateadded": ["2026-11-01", "2026-11-03"],
+        "tags": ["mirai,elf", "elf"], "url_status": ["online"] * 2,
+    }))
+    fig = create_timeseries_chart(records, "tag", ["mirai"])
+    labels = [line.get_label() for line in fig.axes[0].lines]
+    assert "mirai" in labels
+    assert "elf" not in labels

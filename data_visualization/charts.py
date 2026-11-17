@@ -9,10 +9,10 @@ from matplotlib.collections import PolyCollection
 from matplotlib.colors import Normalize
 from matplotlib.figure import Figure
 
-from data_visualization.analysis import calculate_daily_trend
+from data_visualization.analysis import calculate_daily_trend, count_daily_groups
 
 
-def create_timeseries_chart(records):
+def create_timeseries_chart(records, group_by="total", selected_tags=None):
     """Plot prepared records as daily totals with a NumPy linear trend.
 
     Pass an already filtered selection to chart a country, threat, or tag.
@@ -33,15 +33,28 @@ def create_timeseries_chart(records):
         )
         return fig
 
-    ax.plot(
-        daily["date"], daily["url_count"],
-        color="steelblue", marker="o", markersize=4, label="Daily additions",
-    )
+    group_note = ""
+    if group_by == "total":
+        ax.plot(daily["date"], daily["url_count"], color="steelblue",
+                marker="o", markersize=4, label="Daily additions")
+    else:
+        grouped = count_daily_groups(records, group_by, selected_tags)
+        if group_by == "tag":
+            group_note = "Tag groups overlap; untagged records are excluded from tag lines."
+            if not selected_tags:
+                top_tags = grouped.groupby("group")["url_count"].sum().nlargest(10).index
+                grouped = grouped[grouped["group"].isin(top_tags)]
+                group_note += " Showing up to 10 most frequent tags."
+        for label, values in grouped.groupby("group"):
+            ax.plot(values["date"], values["url_count"], marker="o", markersize=3, label=label)
+        if grouped.empty:
+            ax.text(0.02, 0.95, "No matching tags have valid reporting dates.",
+                    transform=ax.transAxes, va="top")
     if result["slope"] is not None:
         ax.plot(
             daily["date"], daily["trend_count"], color="darkorange",
             linestyle="--",
-            label=f"Linear trend (daily count change: {result['slope']:+.2f} per day)",
+            label=f"Overall linear trend (daily count change: {result['slope']:+.2f} per day)",
         )
     else:
         ax.text(
@@ -61,7 +74,8 @@ def create_timeseries_chart(records):
     end = daily["date"].iloc[-1].strftime("%Y-%m-%d")
     fig.text(
         0.01, -0.04,
-        f"{start} to {end} UTC | Source: URLhaus | Reporting dates, not attack start dates; trend is not a forecast.",
+        f"{start} to {end} UTC | Source: URLhaus | Reporting dates, not attack start dates; trend is not a forecast."
+        + (f"\n{group_note}" if group_note else ""),
         fontsize=8,
     )
     return fig
