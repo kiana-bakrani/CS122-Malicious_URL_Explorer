@@ -76,6 +76,7 @@ def fetch_tags():
 
 
 @app.route('/', methods=['GET', 'POST'])
+@app.route('/fetch', methods=['GET', 'POST'])
 def fetch_page():
     records = []
     total_records = None
@@ -146,6 +147,8 @@ def fetch_page():
             preview_df = filtered_df.iloc[offset:last_record].copy()
             if request.method == "GET" and not preview_requested:
                 preview_df = add_countries(preview_df, DATA_DIR / "cache")
+            if "country" not in preview_df:
+                preview_df["country"] = "Unknown"
             preview_df["country"] = preview_df["country"].fillna("Unknown").replace("", "Unknown")
             preview_df["dateadded"] = preview_df["dateadded"].astype(str)
             for column in ("hostname", "tags"):
