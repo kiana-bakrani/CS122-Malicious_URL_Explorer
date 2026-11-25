@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO
 import json
+import os
 from tempfile import NamedTemporaryFile
 import pandas as pd
 
@@ -11,7 +12,8 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Directory for storing CSV files
-DATA_DIR = PROJECT_ROOT / "data"
+DEMO_MODE = os.getenv("URL_EXPLORER_DEMO") == "1"
+DATA_DIR = PROJECT_ROOT / "data" / "demo" if DEMO_MODE else PROJECT_ROOT / "data"
 
 
 def save_cleaned_data(df):

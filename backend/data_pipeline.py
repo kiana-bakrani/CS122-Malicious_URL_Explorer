@@ -11,6 +11,7 @@ import time
 
 from backend.data_storage import (
     DATA_DIR,
+    DEMO_MODE,
     save_cleaned_data,
     save_filtered_data,
     load_csv_data
@@ -22,6 +23,14 @@ def get_cleaned_data():
     """Return cached URLhaus data or download fresh data."""
 
     cache_path = DATA_DIR / "cleaned_urls.csv"
+
+    if DEMO_MODE:
+        # Demonstration mode never calls the live API, even after cache expiry.
+        if not cache_path.is_file():
+            raise ValueError("Run python demo.py to create the sample dataset first.")
+        df = load_csv_data(cache_path)
+        df.attrs["downloaded_at"] = cache_path.stat().st_mtime
+        return df
 
     # Check whether the cache exists
     if cache_path.exists():

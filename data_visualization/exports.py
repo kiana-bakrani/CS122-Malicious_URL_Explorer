@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pandas as pd
+from backend.data_storage import DATA_DIR
 
 from data_visualization.analysis import (
     prepare_records,
@@ -13,7 +14,7 @@ from data_visualization.analysis import (
 )
 
 
-SUMMARY_DIR = Path(__file__).resolve().parent.parent / "data" / "summaries"
+SUMMARY_DIR = DATA_DIR / "summaries"
 
 
 def build_summaries(df):

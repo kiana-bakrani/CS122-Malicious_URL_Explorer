@@ -11,6 +11,9 @@
 <body>
 
 <main class="container">
+    {% if demo_mode %}
+    <p role="status">Sample data — demonstration only. Search uses generated records; no live URLhaus records are downloaded.</p>
+    {% endif %}
     <h1>Malicious URL Explorer</h1>
     <p>Explore reported malware distribution URLs from the <a href="https://urlhaus.abuse.ch/api/#csv">URLhaus recent export</a>.</p>
     <p id="snapshot-status" role="status"{% if not downloaded_at %} hidden{% endif %}>

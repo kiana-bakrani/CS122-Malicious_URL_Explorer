@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
+import os
 
 import app as web
 import backend.data_pipeline as pipeline
@@ -93,3 +94,25 @@ def test_changed_dataset_prevents_stale_download_and_save(monkeypatch, tmp_path)
     assert "The Fetch dataset changed" in html
     assert not directory.exists()
     assert client.get("/results/download/by_country?snapshot=new-snapshot").status_code == 200
+
+
+def test_demo_uses_expired_cache_without_live_api(monkeypatch, tmp_path):
+    records = pd.DataFrame({
+        "id": ["1"], "dateadded": ["2026-11-01"], "last_online": ["2026-11-01"],
+    })
+    path = tmp_path / "cleaned_urls.csv"
+    records.to_csv(path, index=False)
+    os.utime(path, (0, 0))
+    monkeypatch.setattr(pipeline, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(pipeline, "DEMO_MODE", True)
+    def forbidden_download():
+        pytest.fail("Demo mode must never call URLhaus")
+    monkeypatch.setattr(pipeline, "download_recent_export", forbidden_download)
+    assert pipeline.get_cleaned_data()["id"].tolist() == ["1"]
+
+
+def test_missing_demo_cache_explains_setup(monkeypatch, tmp_path):
+    monkeypatch.setattr(pipeline, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(pipeline, "DEMO_MODE", True)
+    with pytest.raises(ValueError, match="demo.py"):
+        pipeline.get_cleaned_data()

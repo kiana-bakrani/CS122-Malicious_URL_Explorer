@@ -6,7 +6,7 @@ from io import BytesIO
 from flask import Flask, abort, jsonify, render_template, request, send_file
 from backend.country_lookup import add_countries
 from backend.data_pipeline import run_pipeline, get_cleaned_data
-from backend.data_storage import DATA_DIR, load_filtered_data
+from backend.data_storage import DATA_DIR, DEMO_MODE, load_filtered_data
 from backend.filters import filter_by_date, filter_by_tag, filter_by_threat
 from data_visualization.analysis import prepare_records, summarize_status
 from data_visualization.charts import create_timeseries_chart, create_country_map, country_display_names
@@ -21,6 +21,11 @@ app = Flask(
 MAX_DATE_DAYS = 30
 PREVIEW_PAGE_SIZE = 20
 app.config["SUMMARY_OUTPUT_DIR"] = SUMMARY_DIR
+
+
+@app.context_processor
+def data_mode_context():
+    return {"demo_mode": DEMO_MODE}
 
 
 def validate_date_range(start_date, end_date):
