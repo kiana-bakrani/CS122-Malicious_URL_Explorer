@@ -10,7 +10,7 @@ from backend.data_storage import DATA_DIR, load_filtered_data
 from backend.filters import filter_by_date, filter_by_tag, filter_by_threat
 from data_visualization.analysis import prepare_records, summarize_status
 from data_visualization.charts import create_timeseries_chart, create_country_map
-from data_visualization.exports import build_summaries
+from data_visualization.exports import SUMMARY_DIR, build_summaries, save_summary_csvs
 
 app = Flask(
     __name__,
@@ -20,6 +20,7 @@ app = Flask(
 
 MAX_DATE_DAYS = 30
 PREVIEW_PAGE_SIZE = 20
+app.config["SUMMARY_OUTPUT_DIR"] = SUMMARY_DIR
 
 
 def validate_date_range(start_date, end_date):
@@ -233,10 +234,12 @@ def download_summary(summary_name):
     )
 
 
-@app.route("/results")
+@app.route("/results", methods=["GET", "POST"])
 def results_page():
     summary = None
     chart_image = None
+    saved_files = []
+    save_error = None
     selected_view = request.args.get("view", "timeseries")
     if selected_view not in ["timeseries", "map"]:
         selected_view = "timeseries"
@@ -273,6 +276,13 @@ def results_page():
                 figure.savefig(image, format="png", dpi=120, bbox_inches="tight")
                 chart_image = base64.b64encode(image.getvalue()).decode("ascii")
                 figure.clear()
+                if request.method == "POST":
+                    try:
+                        paths = save_summary_csvs(records, app.config["SUMMARY_OUTPUT_DIR"])
+                        saved_files = [path.name for path in paths.values()]
+                    except OSError:
+                        app.logger.exception("Failed to save Results summaries")
+                        save_error = "Could not save all summary files. Check that data/summaries/ is writable and try again."
     except FileNotFoundError:
         records = None
     return render_template(
@@ -282,6 +292,7 @@ def results_page():
         selected_tags=selected_tags, selected_status=selected_status,
         selected_view=selected_view, chart_image=chart_image,
         selected_group=selected_group,
+        saved_files=saved_files, save_error=save_error,
     )
 
 

@@ -166,3 +166,11 @@
         gap: 0;
     }
 }
+
+.save-confirmation {
+    border-left: 4px solid #2457a7;
+    background: #eaf0f8;
+    padding: 12px 20px;
+    margin: 16px 0;
+    overflow-wrap: anywhere;
+}

@@ -162,6 +162,17 @@
     </section>
     <section class="results-panel" aria-labelledby="exports-heading">
         <h2 id="exports-heading">Download summary CSVs</h2>
+        <form method="POST" action="{{ url_for('results_page', country=selected_country, threat=selected_threat, tag=selected_tags, status=selected_status, view=selected_view, group_by=selected_group) }}">
+            <button type="submit">Save summaries locally</button>
+        </form>
+        <p class="download-help">Saves all five summaries under <code>data/summaries/</code> on the computer running Flask, using the applied filters. Replaces previous summaries with the same filenames.</p>
+        {% if saved_files %}
+        <div class="save-confirmation" role="status">
+            <p>Saved {{ saved_files | length }} summary CSV files in <code>data/summaries/</code>:</p>
+            <ul>{% for name in saved_files %}<li>{{ name }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if save_error %}<p class="error" role="alert">{{ save_error }}</p>{% endif %}
         <p>Each download uses the applied filters shown above. Files contain summary counts, not individual URLs.</p>
         <ul class="summary-downloads">
             {% for name, label in [('by_country', 'By country'), ('by_threat', 'By threat'), ('by_tag', 'By malware tag'), ('daily_additions', 'Daily additions'), ('status_summary', 'Status summary')] %}
