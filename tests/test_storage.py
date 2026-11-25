@@ -1,5 +1,6 @@
 
 import pandas as pd
+import json
 
 from backend.data_storage import (
     save_cleaned_data,
@@ -65,3 +66,38 @@ def test_load_csv_data(tmp_path):
         loaded_df["dateadded"]
     )
     assert pd.isna(loaded_df.loc[1, "last_online"])
+
+
+def test_fetch_metadata_roundtrip_and_mismatched_csv(monkeypatch, tmp_path):
+    import backend.data_storage as storage
+    monkeypatch.setattr(storage, "DATA_DIR", tmp_path)
+    selection = {"query": "example", "start_date": "2026-11-01",
+                 "end_date": "2026-11-02", "threat": "all", "tag": "mirai"}
+    storage.save_filtered_data(sample_dataframe(), fetch_selection=selection)
+    loaded = storage.load_filtered_data()
+    metadata = loaded.attrs["fetch_metadata"]
+    assert metadata["selection"] == selection
+    assert metadata["record_count"] == 2
+    assert metadata["saved_at"]
+    # Simulate a copied CSV without its matching metadata.
+    sample_dataframe().iloc[:1].to_csv(tmp_path / "filtered_urls.csv", index=False)
+    assert "fetch_metadata" not in storage.load_filtered_data().attrs
+
+
+def test_old_or_invalid_metadata_never_prevents_loading(monkeypatch, tmp_path):
+    import backend.data_storage as storage
+    monkeypatch.setattr(storage, "DATA_DIR", tmp_path)
+    storage.save_filtered_data(sample_dataframe())
+    assert "fetch_metadata" not in storage.load_filtered_data().attrs
+    path = tmp_path / "filtered_urls.metadata.json"
+    for text in ["not JSON", "[]", json.dumps({"selection": None})]:
+        path.write_text(text)
+        assert "fetch_metadata" not in storage.load_filtered_data().attrs
+
+
+def test_save_without_selection_removes_previous_metadata(monkeypatch, tmp_path):
+    import backend.data_storage as storage
+    monkeypatch.setattr(storage, "DATA_DIR", tmp_path)
+    storage.save_filtered_data(sample_dataframe(), fetch_selection={"tag": "mirai"})
+    storage.save_filtered_data(sample_dataframe().iloc[:1])
+    assert not (tmp_path / "filtered_urls.metadata.json").exists()

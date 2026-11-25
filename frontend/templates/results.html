@@ -6,6 +6,7 @@
     <title>Results | Malicious URL Explorer</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='results.css') }}">
+    <script src="{{ url_for('static', filename='results.js') }}" defer></script>
 </head>
 <body>
 <main class="container">
@@ -14,12 +15,24 @@
         <span aria-current="page">Results</span>
     </nav>
     <header>
+        {% if demo_mode %}<p class="demo-banner" role="status">Sample data — demonstration only. No live URLhaus records are being downloaded.</p>{% endif %}
         <p class="page-eyebrow">Malicious URL Explorer</p>
         <h1>Analysis results</h1>
-        <p>Explore reporting patterns and hosting locations in your saved URLhaus selection.</p>
+        <p>See where reported malware URLs are hosted and how daily reports change over time.</p>
+        <ol class="workflow-steps" aria-label="How to use the project">
+            <li><span>1</span> Choose records on Fetch</li>
+            <li class="current-step"><span>2</span> Explore them on Results</li>
+            <li><span>3</span> Download charts or summaries</li>
+        </ol>
     </header>
 
-    {% if records is none %}
+    {% if data_error %}
+    <section class="results-panel" role="alert">
+        <h2>Saved data needs attention</h2>
+        <p>{{ data_error }}</p>
+        <a class="results-link" href="{{ url_for('fetch_page') }}">Go to Fetch page</a>
+    </section>
+    {% elif records is none %}
     <section class="results-panel" aria-labelledby="dataset-heading">
         <h2 id="dataset-heading">Fetch data first</h2>
         <p>No saved selection is available. Use Search on the Fetch page to collect and save records for analysis.</p>
@@ -33,12 +46,33 @@
     </section>
     {% else %}
     <section class="results-panel" aria-labelledby="dataset-heading">
-        <h2 id="dataset-heading">Saved selection</h2>
-        <p><strong>{{ saved_count }}</strong> records from your latest successful Fetch search.</p>
+        <div class="panel-heading">
+            <h2 id="dataset-heading">Your saved dataset</h2>
+            <a href="{{ url_for('fetch_page') }}" class="secondary-link">Change dataset on Fetch</a>
+        </div>
+        <p><strong>{{ saved_count }}</strong> records in the saved dataset.</p>
+        {% if dataset_period %}<p class="dataset-period">Reporting dates in this file: {{ dataset_period }} (UTC)</p>{% endif %}
+        {% if fetch_metadata %}
+        <h3>Fetch selection</h3>
+        <dl class="fetch-selection">
+            <div><dt>URL search</dt><dd>{{ fetch_metadata.selection.get('query') or 'All URLs' }}</dd></div>
+            <div><dt>Date range (UTC)</dt><dd>{{ fetch_metadata.selection.get('start_date') or 'Not recorded' }} to {{ fetch_metadata.selection.get('end_date') or 'Not recorded' }}</dd></div>
+            <div><dt>Threat</dt><dd>{{ fetch_metadata.selection.get('threat') or 'all' }}</dd></div>
+            <div><dt>Tag</dt><dd>{{ fetch_metadata.selection.get('tag') or 'all' }}</dd></div>
+            <div><dt>Saved at (UTC)</dt><dd>{{ fetch_metadata.saved_at }}</dd></div>
+        </dl>
+        {% else %}
+        <p>Original Fetch selections are unavailable for this imported or older CSV. Run a new Fetch search to record them.</p>
+        {% endif %}
+        <p class="dataset-help">This page analyzes a saved snapshot, not a live feed. Country and status filters below only narrow this dataset.</p>
         <a href="{{ url_for('fetch_page', saved=1) }}">Review saved records</a>
     </section>
 
     <form method="GET" action="{{ url_for('results_page') }}" class="results-panel country-filter">
+        <div class="filter-introduction">
+            <h2>Choose what to explore</h2>
+            <p>Choose a country, status, and chart. Click <strong>Apply filters</strong> to update the results.</p>
+        </div>
         <div class="form-group">
             <label for="results-country">Hosting country</label>
             <select id="results-country" name="country">
@@ -47,21 +81,10 @@
                 <option value="{{ selected_country }}" selected>{{ selected_country }} (unavailable)</option>
                 {% endif %}
                 {% for country in countries %}
-                <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country }}</option>
+                <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country_labels.get(country, country) }}</option>
                 {% endfor %}
             </select>
-        </div>
-        <div class="form-group">
-            <label for="results-threat">Threat category</label>
-            <select id="results-threat" name="threat">
-                <option value="all"{% if selected_threat == 'all' %} selected{% endif %}>All threats</option>
-                {% for threat in threats %}
-                <option value="{{ threat }}"{% if threat == selected_threat %} selected{% endif %}>{{ threat }}</option>
-                {% endfor %}
-                {% if selected_threat != 'all' and selected_threat not in threats %}
-                <option value="{{ selected_threat }}" selected>{{ selected_threat }} (unavailable)</option>
-                {% endif %}
-            </select>
+            <small>Where the URL's server is hosted. Unknown means no country was resolved.</small>
         </div>
         <div class="form-group">
             <label for="results-status">URL status</label>
@@ -73,49 +96,36 @@
                 <option value="{{ selected_status }}" selected>{{ selected_status }} (unavailable)</option>
                 {% endif %}
             </select>
+            <small>Online or offline when recorded by URLhaus, not a live availability check.</small>
         </div>
-        <fieldset class="tag-filter">
-            <legend>Malware tags</legend>
-            <p>Select any matching tag. Leave all unchecked to include every tag.</p>
-            <div class="tag-options">
-                {% for tag in tags %}
-                <label><input type="checkbox" name="tag" value="{{ tag }}"{% if tag in selected_tags %} checked{% endif %}> {{ tag }}</label>
-                {% endfor %}
-                {% for tag in selected_tags if tag not in tags %}
-                <label><input type="checkbox" name="tag" value="{{ tag }}" checked> {{ tag }} (unavailable)</label>
-                {% endfor %}
-            </div>
-            {% if not tags %}<p>No malware tags are available in this saved selection.</p>{% endif %}
-        </fieldset>
         <fieldset class="chart-choice">
             <legend>Chart</legend>
             <label><input type="radio" name="view" value="timeseries"{% if selected_view == 'timeseries' %} checked{% endif %}> Time series — Daily additions</label>
             <label><input type="radio" name="view" value="map"{% if selected_view == 'map' %} checked{% endif %}> Country map — Hosting countries</label>
         </fieldset>
-        <div class="form-group">
+        <div class="form-group" id="timeseries-group-controls">
             <label for="results-group">Group time-series lines by</label>
             <select id="results-group" name="group_by">
                 {% for value, label in [('total', 'Total'), ('threat', 'Threat category'), ('tag', 'Malware tag')] %}
                 <option value="{{ value }}"{% if selected_group == value %} selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <small>Applies to the time series; the country map is unchanged.</small>
+            <small>Total gives one daily count. Threat and tag compare categories in the saved dataset.</small>
         </div>
         <button type="submit">Apply filters</button>
         <a href="{{ url_for('results_page') }}">Reset</a>
-        <p class="filter-description">Filters update this analysis without changing your saved records.</p>
+        <p class="filter-description">Reset shows the entire saved dataset again. Your saved records are never changed by these filters.</p>
     </form>
 
     {% if records.empty %}
     <section class="results-panel" role="status">
         <h2>No records match these filters</h2>
-        <p>Change the country, threat, tags, or status, or reset all filters.</p>
+        <p>Change the country or status, or reset the Results filters.</p>
     </section>
     {% else %}
     <section class="results-panel" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary statistics</h2>
-        <p>Showing {{ records | length }} records · {{ 'All countries' if selected_country == 'all' else selected_country }}</p>
-        <p>Threat: {{ selected_threat }} · Status: {{ selected_status }} · Tags: {{ selected_tags | join(', ') if selected_tags else 'all' }}</p>
+        <p class="selection-context">Showing {{ records | length }} records · {{ 'All countries' if selected_country == 'all' else country_labels.get(selected_country, selected_country) }} · {{ 'All statuses' if selected_status == 'all' else selected_status | capitalize }}</p>
         <dl class="summary-grid">
             <div class="summary-card">
                 <dt>Total records</dt>
@@ -138,19 +148,25 @@
                 <dd>{% if summary.offline_percentage is not none %}{{ '%.1f' | format(summary.offline_percentage) }}%{% else %}N/A{% endif %}</dd>
             </div>
         </dl>
-        <p class="results-note">Offline percentage = offline ÷ (online + offline) × 100.
-            Unknown statuses are excluded from this percentage.
-            {% if summary.offline_percentage is none %}No records have a known online/offline status.{% endif %}
-            Counts describe the saved snapshot, not live availability.</p>
+        {% if selected_status == 'offline' %}<p class="inline-help">You are viewing only offline records, so the offline percentage is 100% for this selection.</p>{% endif %}
+        {% if selected_status == 'online' %}<p class="inline-help">You are viewing only online records, so the offline percentage is 0% for this selection.</p>{% endif %}
+        <details class="reading-guide">
+            <summary>What do these numbers mean?</summary>
+            <p>Each record represents one reported URL. The same host can have several URL records.</p>
+            <p>Offline percentage = offline ÷ (online + offline) × 100. Unknown statuses are excluded from this percentage.
+                {% if summary.offline_percentage is none %}No records have a known online/offline status.{% endif %}</p>
+            <p>Counts describe the saved snapshot, not live availability. Offline does not prove a site is safe.</p>
+            <p>Online duration is unavailable from a single snapshot. Repeated timestamped status observations are needed to estimate it.</p>
+        </details>
     </section>
     <section class="results-panel" aria-labelledby="chart-heading">
         <h2 id="chart-heading">{{ 'Hosting countries' if selected_view == 'map' else 'Daily additions' }}</h2>
         {% if selected_view == 'map' %}
-        <p>Reported URLs grouped by hosting country. Unknown and unmapped locations are counted separately below the map.</p>
+        <p>Darker countries have more reported URLs in this selection. Unknown and unmapped locations are counted separately below the map.</p>
         {% else %}
-        <p>Daily reported URL counts grouped by {{ selected_group }}, with the overall fitted trend for the current selection.</p>
+        <p>{{ 'One count per day' if selected_group == 'total' else 'Separate daily lines by threat category' if selected_group == 'threat' else 'Separate daily lines by malware tag' }}, with a dashed trend for all records in the current selection.</p>
         {% if selected_group == 'tag' %}
-        <p>Tag lines can overlap. Selected tags are shown; if none are selected, up to 10 most frequent tags are shown. Untagged records are excluded from tag lines. The trend still describes all filtered records.</p>
+        <p>Tag lines can overlap. Up to 10 most frequent tags in the current selection are shown. Untagged records are excluded from tag lines. The trend describes all records in the current country/status selection.</p>
         {% endif %}
         {% endif %}
         <img class="results-chart" src="data:image/png;base64,{{ chart_image }}"
@@ -158,28 +174,44 @@
         <a class="results-link save-plot" href="data:image/png;base64,{{ chart_image }}"
            download="urlhaus-{{ selected_view }}.png">Save Plot (PNG)</a>
         <p class="download-help">Downloads the chart currently displayed above, including your applied filters.</p>
-        <p>The chart uses the same country, threat, tag, and status filters as the statistics above.</p>
+        <p>The chart uses the same country and status filters as the statistics above.</p>
+        <details class="reading-guide">
+            <summary>How to read this chart</summary>
+            {% if selected_view == 'map' %}
+            <p>The color scale shows URL counts, not rates adjusted for population or server count. Multiple URLs can share one host.</p>
+            <p>Hosting country describes server infrastructure, not the attacker's location. A country with no colored records is not necessarily free of threats.</p>
+            {% else %}
+            <p>The horizontal axis is the UTC reporting date; the vertical axis is newly reported URLs. These are additions to URLhaus, not the dates attacks began.</p>
+            <p>The dashed line is a NumPy best-fit line for the total. A positive slope means daily counts tend to rise over this interval; a negative slope means they tend to fall. It is not a forecast.</p>
+            <p>A straight-line fit can extend below zero. Those fitted values are not negative URL counts.</p>
+            <p>Zero-count days between the first and last reporting dates are included. The first and last days may cover only part of a day.</p>
+            {% if selected_group == 'threat' %}<p>If the saved dataset contains one threat category, only one category line will appear. Malware-tag grouping can provide more detail.</p>{% endif %}
+            {% endif %}
+        </details>
     </section>
     <section class="results-panel" aria-labelledby="exports-heading">
         <h2 id="exports-heading">Download summary CSVs</h2>
-        <form method="POST" action="{{ url_for('results_page', country=selected_country, threat=selected_threat, tag=selected_tags, status=selected_status, view=selected_view, group_by=selected_group) }}">
+        <p>Take the current analysis with you. CSV files open in a spreadsheet and contain summary counts, not individual URLs.</p>
+        <ul class="summary-downloads">
+            {% for name, label in [('by_country', 'By country'), ('by_threat', 'By threat'), ('by_tag', 'By malware tag'), ('daily_additions', 'Daily additions'), ('status_summary', 'Status summary')] %}
+            <li><a href="{{ url_for('download_summary', summary_name=name, country=selected_country, status=selected_status, snapshot=snapshot_id) }}">{{ label }} (CSV)</a></li>
+            {% endfor %}
+        </ul>
+        <p class="download-help">Downloads use the country/status selection shown above. Tag groups can overlap; unavailable offline percentages are blank.</p>
+        <details class="reading-guide"{% if saved_files or save_error %} open{% endif %}>
+            <summary>Save all five summaries on the Flask computer</summary>
+        <form method="POST" action="{{ url_for('results_page', country=selected_country, status=selected_status, view=selected_view, group_by=selected_group, snapshot=snapshot_id) }}">
             <button type="submit">Save summaries locally</button>
         </form>
-        <p class="download-help">Saves all five summaries under <code>data/summaries/</code> on the computer running Flask, using the applied filters. Replaces previous summaries with the same filenames.</p>
+        <p class="download-help">Saves all five summaries under <code>{{ 'data/demo/summaries/' if demo_mode else 'data/summaries/' }}</code> on the computer running Flask, using the applied filters. Replaces previous summaries with the same filenames. Refresh Results after a new Fetch search before saving.</p>
         {% if saved_files %}
         <div class="save-confirmation" role="status">
-            <p>Saved {{ saved_files | length }} summary CSV files in <code>data/summaries/</code>:</p>
+            <p>Saved {{ saved_files | length }} summary CSV files in <code>{{ 'data/demo/summaries/' if demo_mode else 'data/summaries/' }}</code>:</p>
             <ul>{% for name in saved_files %}<li>{{ name }}</li>{% endfor %}</ul>
         </div>
         {% endif %}
         {% if save_error %}<p class="error" role="alert">{{ save_error }}</p>{% endif %}
-        <p>Each download uses the applied filters shown above. Files contain summary counts, not individual URLs.</p>
-        <ul class="summary-downloads">
-            {% for name, label in [('by_country', 'By country'), ('by_threat', 'By threat'), ('by_tag', 'By malware tag'), ('daily_additions', 'Daily additions'), ('status_summary', 'Status summary')] %}
-            <li><a href="{{ url_for('download_summary', summary_name=name, country=selected_country, threat=selected_threat, tag=selected_tags, status=selected_status) }}">{{ label }} (CSV)</a></li>
-            {% endfor %}
-        </ul>
-        <p class="download-help">Downloads read the latest saved selection. If a new Fetch search is saved, refresh Results before downloading. Tag groups can overlap; unavailable offline percentages are blank.</p>
+        </details>
     </section>
     <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
     {% endif %}

@@ -9,7 +9,7 @@ from backend.data_pipeline import run_pipeline, get_cleaned_data
 from backend.data_storage import DATA_DIR, load_filtered_data
 from backend.filters import filter_by_date, filter_by_tag, filter_by_threat
 from data_visualization.analysis import prepare_records, summarize_status
-from data_visualization.charts import create_timeseries_chart, create_country_map
+from data_visualization.charts import create_timeseries_chart, create_country_map, country_display_names
 from data_visualization.exports import SUMMARY_DIR, build_summaries, save_summary_csvs
 
 app = Flask(
@@ -77,6 +77,7 @@ def fetch_tags():
 
 
 @app.route('/', methods=['GET', 'POST'])
+@app.route('/fetch', methods=['GET', 'POST'])
 def fetch_page():
     records = []
     total_records = None
@@ -113,7 +114,15 @@ def fetch_page():
         filtered_df = None
         if preview_requested:
             filtered_df = load_filtered_data()
-        else:
+            metadata = filtered_df.attrs.get("fetch_metadata")
+            if metadata:
+                selection = metadata["selection"]
+                start_date = selection.get("start_date", start_date)
+                end_date = selection.get("end_date", end_date)
+                selected_threat = selection.get("threat", "all")
+                selected_tag = selection.get("tag", "all")
+                query = selection.get("query", "")
+        elif error is None:
             df = get_cleaned_data()
             downloaded_at = snapshot_time(df)
             threats = sorted(df["threat"].dropna().unique().tolist())
@@ -131,6 +140,10 @@ def fetch_page():
                         threat=selected_threat,
                         tag=selected_tag,
                         cleaned_data=date_records,
+                        fetch_selection={
+                            "query": query, "start_date": start_date, "end_date": end_date,
+                            "threat": selected_threat, "tag": selected_tag,
+                        },
                     )
                 else:
                     filtered_df = filter_by_tag(
@@ -147,6 +160,8 @@ def fetch_page():
             preview_df = filtered_df.iloc[offset:last_record].copy()
             if request.method == "GET" and not preview_requested:
                 preview_df = add_countries(preview_df, DATA_DIR / "cache")
+            if "country" not in preview_df:
+                preview_df["country"] = "Unknown"
             preview_df["country"] = preview_df["country"].fillna("Unknown").replace("", "Unknown")
             preview_df["dateadded"] = preview_df["dateadded"].astype(str)
             for column in ("hostname", "tags"):
@@ -185,30 +200,20 @@ def fetch_page():
     )
 
 
-def filter_results_records(records, country, threat, tags, status):
+def filter_results_records(records, country, status):
     """Apply identical Results filters to the page and summary downloads."""
     if country != "all":
         records = records[records["country"] == country].copy()
-    records = filter_by_threat(records, threat)
-    if tags:
-        matches = records["tags"].apply(
-            lambda value: bool(
-                {tag.strip().lower() for tag in str(value).split(",")} & set(tags)
-            )
-        )
-        records = records[matches].copy()
     if status != "all":
         records = records[records["url_status"] == status].copy()
     return records
 
 
 def results_filter_values():
-    """Read applied query parameters, including repeated malware tags."""
+    """Results narrows the saved Fetch selection by country and status only."""
     return {
         "country": request.args.get("country", "all").strip() or "all",
-        "threat": request.args.get("threat", "all").strip() or "all",
         "status": request.args.get("status", "all").strip() or "all",
-        "tags": sorted({tag.strip().lower() for tag in request.args.getlist("tag") if tag.strip()}),
     }
 
 
@@ -221,9 +226,16 @@ def download_summary(summary_name):
         records = load_filtered_data()
     except FileNotFoundError:
         abort(404, description="Fetch and save records before downloading summaries.")
+    except (ValueError, OSError):
+        abort(400, description="The saved CSV could not be read. Fetch and save a new selection.")
+    if request.args.get("snapshot") and request.args["snapshot"] != records.attrs.get("snapshot_id"):
+        abort(409, description="The Fetch dataset changed. Refresh Results before downloading summaries.")
     if records.empty:
         abort(400, description="The saved selection is empty.")
-    records = filter_results_records(prepare_records(records), **results_filter_values())
+    try:
+        records = filter_results_records(prepare_records(records), **results_filter_values())
+    except ValueError:
+        abort(400, description="The saved CSV is missing required analysis columns.")
     if records.empty:
         abort(400, description="No records match the selected filters.")
     summary = build_summaries(records)[summary_name]
@@ -240,6 +252,9 @@ def results_page():
     chart_image = None
     saved_files = []
     save_error = None
+    data_error = None
+    fetch_metadata = None
+    snapshot_id = None
     selected_view = request.args.get("view", "timeseries")
     if selected_view not in ["timeseries", "map"]:
         selected_view = "timeseries"
@@ -247,22 +262,29 @@ def results_page():
     if selected_group not in ["total", "threat", "tag"]:
         selected_group = "total"
     countries = []
-    threats = []
-    tags = []
+    country_labels = {}
+    dataset_period = None
     saved_count = 0
     filters = results_filter_values()
     selected_country = filters["country"]
-    selected_threat = filters["threat"]
     selected_status = filters["status"]
-    selected_tags = filters["tags"]
     try:
         records = load_filtered_data()
+        fetch_metadata = records.attrs.get("fetch_metadata")
+        snapshot_id = records.attrs.get("snapshot_id")
         if not records.empty:
             records = prepare_records(records)
             saved_count = len(records)
             countries = sorted(records["country"].unique().tolist())
-            threats = sorted(records["threat"].unique().tolist())
-            tags = ranked_tags(records)
+            names = country_display_names()
+            country_labels = {
+                code: ("Unknown hosting country" if code == "Unknown"
+                       else f"{names[code]} ({code})" if code in names else code)
+                for code in countries
+            }
+            valid_dates = records["dateadded"].dropna()
+            if not valid_dates.empty:
+                dataset_period = f"{valid_dates.min():%b %d, %Y} – {valid_dates.max():%b %d, %Y}"
             records = filter_results_records(records, **filters)
             summary = summarize_status(records)
             if not records.empty:
@@ -271,28 +293,37 @@ def results_page():
                 elif selected_group == "total":
                     figure = create_timeseries_chart(records)
                 else:
-                    figure = create_timeseries_chart(records, selected_group, selected_tags)
+                    figure = create_timeseries_chart(records, selected_group)
                 image = BytesIO()
                 figure.savefig(image, format="png", dpi=120, bbox_inches="tight")
                 chart_image = base64.b64encode(image.getvalue()).decode("ascii")
                 figure.clear()
                 if request.method == "POST":
-                    try:
-                        paths = save_summary_csvs(records, app.config["SUMMARY_OUTPUT_DIR"])
-                        saved_files = [path.name for path in paths.values()]
-                    except OSError:
-                        app.logger.exception("Failed to save Results summaries")
-                        save_error = "Could not save all summary files. Check that data/summaries/ is writable and try again."
+                    if request.args.get("snapshot") and request.args["snapshot"] != snapshot_id:
+                        save_error = "The Fetch dataset changed. Review these refreshed results before saving summaries."
+                    else:
+                        try:
+                            paths = save_summary_csvs(records, app.config["SUMMARY_OUTPUT_DIR"])
+                            saved_files = [path.name for path in paths.values()]
+                        except OSError:
+                            app.logger.exception("Failed to save Results summaries")
+                            save_error = "Could not save all summary files. Check that data/summaries/ is writable and try again."
     except FileNotFoundError:
         records = None
+    except (ValueError, OSError):
+        app.logger.exception("Could not read saved Results data")
+        records = None
+        data_error = "The saved dataset could not be analyzed. Return to Fetch and save a new selection."
     return render_template(
         "results.html", records=records, summary=summary,
         countries=countries, selected_country=selected_country, saved_count=saved_count,
-        threats=threats, tags=tags, selected_threat=selected_threat,
-        selected_tags=selected_tags, selected_status=selected_status,
+        selected_status=selected_status,
         selected_view=selected_view, chart_image=chart_image,
         selected_group=selected_group,
         saved_files=saved_files, save_error=save_error,
+        fetch_metadata=fetch_metadata, data_error=data_error,
+        snapshot_id=snapshot_id,
+        country_labels=country_labels, dataset_period=dataset_period,
     )
 
 

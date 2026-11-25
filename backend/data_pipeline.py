@@ -48,7 +48,7 @@ def get_cleaned_data():
 
     return df
 
-def run_pipeline(start_date=None, end_date=None, threat=None, tag=None, *, cleaned_data=None):
+def run_pipeline(start_date=None, end_date=None, threat=None, tag=None, *, cleaned_data=None, fetch_selection=None):
     """Filter and save URLhaus records from the supplied snapshot or cache."""
     df = get_cleaned_data() if cleaned_data is None else cleaned_data
 
@@ -57,7 +57,7 @@ def run_pipeline(start_date=None, end_date=None, threat=None, tag=None, *, clean
     filtered_df = filter_by_tag(filtered_df, tag)
     filtered_df = add_countries(filtered_df, DATA_DIR / "cache")
 
-    filtered_path = save_filtered_data(filtered_df)
+    filtered_path = save_filtered_data(filtered_df, fetch_selection=fetch_selection)
 
     print(f"Cleaned records: {len(df)}")
     print(f"Filtered records: {len(filtered_df)}")

@@ -12,6 +12,21 @@ from matplotlib.figure import Figure
 from data_visualization.analysis import calculate_daily_trend, count_daily_groups
 
 
+def country_display_names():
+    """Use names from the local boundary file; codes still work if it is absent."""
+    path = Path(__file__).resolve().parent.parent / "data/cache/countries.geojson"
+    try:
+        with path.open(encoding="utf-8") as source:
+            features = json.load(source)["features"]
+        return {
+            feature["properties"]["ISO_A2_EH"]: feature["properties"]["NAME_EN"]
+            for feature in features
+            if len(feature["properties"].get("ISO_A2_EH", "")) == 2
+        }
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
 def create_timeseries_chart(records, group_by="total", selected_tags=None):
     """Plot prepared records as daily totals with a NumPy linear trend.
 
@@ -133,8 +148,13 @@ def create_country_map(records, boundary_path=None):
     ax.set_ylabel("Latitude")
     fig.colorbar(collection, ax=ax, shrink=0.7, label="Reported URL count")
     mapped = int(counts[counts.index.isin(mapped_codes)].sum())
+    date_note = ""
+    if "dateadded" in records:
+        dates = records["dateadded"].dropna()
+        if not dates.empty:
+            date_note = f"Reporting dates: {dates.min():%Y-%m-%d} to {dates.max():%Y-%m-%d} UTC | "
     fig.text(0.01, -0.03,
-             f"Mapped: {mapped} | Unknown/unmapped: {len(records) - mapped} | "
+             date_note + f"Mapped: {mapped} | Unknown/unmapped: {len(records) - mapped}\n"
              "Hosting location, not attacker origin.\n"
              "Sources: URLhaus; Natural Earth (public domain); IP Geolocation by DB-IP (db-ip.com).",
              fontsize=8)

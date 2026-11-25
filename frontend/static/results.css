@@ -5,6 +5,51 @@
     margin-bottom: 32px;
 }
 
+.workflow-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    list-style: none;
+    margin: 28px 0 0;
+    padding: 0;
+    color: #526078;
+}
+
+.demo-banner {
+    border: 1px solid #ccd3df;
+    background: #eaf0f8;
+    padding: 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.workflow-steps li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.workflow-steps span {
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid #ccd3df;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+}
+
+.workflow-steps .current-step {
+    color: #2457a7;
+    font-weight: bold;
+}
+
+.current-step span {
+    background: #2457a7;
+    color: white;
+    border-color: #2457a7;
+}
+
 .results-navigation [aria-current="page"] {
     font-weight: bold;
     border-bottom: 2px solid #2457a7;
@@ -29,10 +74,21 @@
     font-size: 1.25rem;
 }
 
-.chart-sections {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
+.panel-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.panel-heading h2 {
+    margin-bottom: 0;
+}
+
+.dataset-period, .dataset-help {
+    color: #526078;
+    line-height: 1.6;
 }
 
 .summary-grid {
@@ -60,31 +116,22 @@
     color: #526078;
 }
 
-.tag-filter {
+.filter-introduction {
     flex-basis: 100%;
-    min-width: 0;
-    border: 1px solid #ccd3df;
-    border-radius: 6px;
-    padding: 16px;
 }
 
-.tag-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 20px;
-    max-height: 180px;
-    overflow-y: auto;
+.filter-introduction p {
+    margin-bottom: 0;
+    line-height: 1.6;
 }
 
-.tag-options label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow-wrap: anywhere;
+.form-group small {
+    color: #526078;
+    line-height: 1.5;
 }
 
-.tag-options input {
-    width: auto;
+#timeseries-group-controls[hidden] {
+    display: none;
 }
 
 .chart-choice {
@@ -130,6 +177,14 @@
     line-height: 1.6;
 }
 
+.save-confirmation {
+    border-left: 4px solid #2457a7;
+    background: #eaf0f8;
+    padding: 12px 20px;
+    margin: 16px 0;
+    overflow-wrap: anywhere;
+}
+
 .summary-card {
     background: #f5f7fb;
     border-radius: 8px;
@@ -147,12 +202,40 @@
     font-weight: bold;
 }
 
-.section-placeholder {
-    color: #526078;
-    background: #f5f7fb;
-    padding: 20px;
+.selection-context {
+    background: #eaf0f8;
     border-radius: 6px;
+    padding: 12px 16px;
     line-height: 1.6;
+}
+
+.reading-guide {
+    border-top: 1px solid #e5e9f0;
+    margin-top: 20px;
+    padding-top: 16px;
+    line-height: 1.6;
+}
+
+.reading-guide summary {
+    color: #2457a7;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.reading-guide form {
+    margin-top: 16px;
+}
+
+.inline-help {
+    color: #526078;
+    line-height: 1.6;
+}
+
+.container a:focus-visible, .container button:focus-visible,
+.container input:focus-visible, .container select:focus-visible,
+.container summary:focus-visible {
+    outline: 3px solid #2457a7;
+    outline-offset: 4px;
 }
 
 .results-note, .results-footer {
@@ -160,17 +243,36 @@
     line-height: 1.6;
 }
 
-@media (max-width: 800px) {
-    .chart-sections {
-        grid-template-columns: 1fr;
-        gap: 0;
+@media (max-width: 500px) {
+    .results-panel {
+        padding: 20px 16px;
+    }
+
+    .country-filter .form-group {
+        max-width: none;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .summary-card {
+        padding: 16px;
     }
 }
 
-.save-confirmation {
-    border-left: 4px solid #2457a7;
-    background: #eaf0f8;
-    padding: 12px 20px;
-    margin: 16px 0;
+.fetch-selection {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.fetch-selection dt {
+    color: #526078;
+    font-weight: bold;
+}
+
+.fetch-selection dd {
+    margin: 6px 0 0;
     overflow-wrap: anywhere;
 }

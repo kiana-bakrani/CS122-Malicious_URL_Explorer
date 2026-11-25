@@ -31,7 +31,7 @@ def records(monkeypatch):
 def test_download_contents_use_all_applied_filters(records, name):
     original = records.copy(deep=True)
     response = web.app.test_client().get(f"/results/download/{name}", query_string={
-        "country": "US", "threat": "category_a", "tag": "mirai", "status": "offline"
+        "country": "US", "status": "offline"
     })
     assert response.status_code == 200
     assert response.mimetype == "text/csv"
@@ -39,22 +39,22 @@ def test_download_contents_use_all_applied_filters(records, name):
     summary = pd.read_csv(StringIO(response.get_data(as_text=True)))
     assert not any(column.startswith("Unnamed:") for column in summary)
     if name == "status_summary":
-        assert summary.iloc[0]["total"] == 1
+        assert summary.iloc[0]["total"] == 2
         assert summary.iloc[0]["offline_percentage"] == 100
     elif name == "by_tag":
-        assert dict(summary.values) == {"elf": 1, "mirai": 1}
+        assert dict(summary.values) == {"mirai": 2, "elf": 1}
     else:
-        assert summary["url_count"].tolist() == [1]
+        assert summary["url_count"].sum() == 2
         if name == "by_country":
             assert summary["country"].tolist() == ["US"]
         if name == "by_threat":
-            assert summary["threat"].tolist() == ["category_a"]
+            assert set(summary["threat"]) == {"category_a", "category_b"}
         if name == "daily_additions":
             assert summary["date"].iloc[0].startswith("2026-11-01")
     pd.testing.assert_frame_equal(records, original)
 
 
-def test_download_links_preserve_multiple_tags_and_filters(records):
+def test_download_links_preserve_only_results_filters(records):
     html = web.app.test_client().get("/results", query_string={
         "country": "US", "threat": "category_a", "tag": ["mirai", "elf"], "status": "offline"
     }).get_data(as_text=True)
@@ -62,8 +62,7 @@ def test_download_links_preserve_multiple_tags_and_filters(records):
     assert len(links) == 5
     for link in links:
         query = parse_qs(urlsplit(unescape(link)).query)
-        assert query == {"country": ["US"], "threat": ["category_a"],
-                         "tag": ["elf", "mirai"], "status": ["offline"]}
+        assert query == {"country": ["US"], "status": ["offline"]}
 
 
 def test_download_without_matches_or_unknown_summary(records):

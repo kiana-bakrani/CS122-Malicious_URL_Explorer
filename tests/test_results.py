@@ -18,15 +18,15 @@ def test_grouping_control_passes_applied_choice_to_chart(monkeypatch, group):
     monkeypatch.setattr(web, "load_filtered_data", lambda: records)
     received = []
 
-    def capture(selection, group_by, selected_tags):
-        received.append((len(selection), group_by, selected_tags))
+    def capture(selection, group_by):
+        received.append((len(selection), group_by))
         return Figure()
 
     monkeypatch.setattr(web, "create_timeseries_chart", capture)
     html = web.app.test_client().get("/results", query_string={
         "country": "US", "group_by": group, "tag": "mirai"
     }).get_data(as_text=True)
-    assert received == [(1, group, ["mirai"])]
+    assert received == [(1, group)]
     assert f'value="{group}" selected' in html
     assert "Save Plot (PNG)" in html
 
@@ -57,7 +57,7 @@ def test_selected_chart_uses_the_same_filtered_records_as_statistics(monkeypatch
     assert received == ["1"]
     assert "Showing 1 records" in html
     assert f'value="{view}" checked' in html
-    assert 'value="mirai" checked' in html
+    assert 'name="tag"' not in html
     encoded = re.search(r'src="data:image/png;base64,([^"]+)"', html).group(1)
     assert base64.b64decode(encoded).startswith(b"\x89PNG\r\n\x1a\n")
     # Download the existing image, so data changes cannot alter the saved chart.
@@ -174,17 +174,17 @@ def test_country_without_matches_keeps_dropdown_and_reset(monkeypatch):
 
 
 @pytest.mark.parametrize("query, expected_count", [
-    ({"threat": "category_a"}, 3),
+    ({"threat": "category_a"}, 4),
     ({"status": "offline"}, 2),
     ({"status": "unknown"}, 1),
-    ({"tag": "mirai"}, 2),
-    ({"tag": ["mirai", "elf"]}, 3),
+    ({"tag": "mirai"}, 4),
+    ({"tag": ["mirai", "elf"]}, 4),
     ({"country": "US", "threat": "category_a", "tag": "mirai", "status": "offline"}, 1),
-    ({"tag": "mir"}, 0),
+    ({"tag": "mir"}, 4),
     ({"country": "DE", "status": "online"}, 0),
     ({"status": "unavailable"}, 0),
 ])
-def test_results_filters_combine_and_match_complete_tags(monkeypatch, query, expected_count):
+def test_results_country_status_filters_ignore_legacy_threat_tag_parameters(monkeypatch, query, expected_count):
     records = pd.DataFrame({
         "id": ["1", "2", "3", "4"],
         "dateadded": ["2026-11-01"] * 4,
@@ -203,9 +203,7 @@ def test_results_filters_combine_and_match_complete_tags(monkeypatch, query, exp
         assert f"Showing {expected_count} records" in html
     else:
         assert "No records match these filters" in html
-    assert 'value="category_b"' in html  # Options remain available after filtering.
-    for tag in query.get("tag", []) if isinstance(query.get("tag"), list) else [query.get("tag")]:
-        if tag:
-            assert f'value="{tag}" checked' in html
+    assert 'name="threat"' not in html
+    assert 'name="tag"' not in html
     assert "Showing 4 records" in client.get("/results").get_data(as_text=True)
     pd.testing.assert_frame_equal(records, original)
