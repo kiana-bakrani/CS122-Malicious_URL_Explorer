@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 from pathlib import Path
 
@@ -13,7 +12,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 def download_recent_export():
     """Download recent URLhaus records as CSV text."""
 
-    auth_key = os.getenv("URLHAUS_AUTH_KEY")
+    auth_key = os.getenv("URLHAUS_AUTH_KEY", "").strip()
 
     if not auth_key:
         raise ValueError("Missing URLHAUS_AUTH_KEY in .env")
@@ -28,7 +27,7 @@ def download_recent_export():
         response.raise_for_status()
         return response.text
 
-    except requests.RequestException as error:
+    except requests.RequestException:
         raise RuntimeError(
             "Failed to download URLhaus data"
-        ) from error
+        ) from None  # Request errors may contain the secret key in the URL.

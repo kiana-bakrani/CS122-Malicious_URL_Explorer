@@ -101,3 +101,13 @@ def test_linear_trend_requires_two_reporting_days(dates):
     assert result["slope"] is None
     assert result["intercept"] is None
     assert result["daily"]["trend_count"].isna().all()
+
+
+def test_mixed_date_formats_and_country_codes_are_normalized():
+    records = prepare_records(pd.DataFrame({
+        "dateadded": ["2026-11-01", "2026-11-02T12:30:00Z", "2026-11-03 01:00:00+00:00"],
+        "country": [" us ", "unknown", "invalid country"],
+        "url_status": ["online", "offline", None],
+    }))
+    assert records["dateadded"].notna().all()
+    assert records["country"].tolist() == ["US", "Unknown", "Unknown"]

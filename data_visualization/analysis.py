@@ -7,8 +7,11 @@ import pandas as pd
 def prepare_records(df):
     """Prepare a copy for analysis without changing the collected records."""
     records = df.copy()
+    missing = {"dateadded", "url_status"} - set(records.columns)
+    if missing:
+        raise ValueError("Missing required analysis columns: " + ", ".join(sorted(missing)))
     records["dateadded"] = pd.to_datetime(
-        records["dateadded"], utc=True, errors="coerce"
+        records["dateadded"], utc=True, errors="coerce", format="mixed"
     )
 
     # Missing IDs cannot identify duplicates; keep those rows individually.
@@ -23,6 +26,8 @@ def prepare_records(df):
             records[column] = "Unknown"
         records[column] = records[column].fillna("Unknown").astype(str).str.strip()
         records[column] = records[column].replace("", "Unknown")
+    country_codes = records["country"].str.upper()
+    records["country"] = country_codes.where(country_codes.str.fullmatch("[A-Z]{2}"), "Unknown")
 
     if "tags" not in records.columns:
         records["tags"] = ""
