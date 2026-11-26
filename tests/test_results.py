@@ -125,7 +125,7 @@ def test_results_layout_with_saved_records(monkeypatch):
     assert b"<strong>2</strong> records" in response.data
     assert b"Summary statistics" in response.data
     assert b"Daily additions" in response.data
-    assert b"Hosting countries" in response.data
+    assert b"Country map" in response.data
     assert b"IP Geolocation by DB-IP" in response.data
     assert b"50.0%" in response.data
 

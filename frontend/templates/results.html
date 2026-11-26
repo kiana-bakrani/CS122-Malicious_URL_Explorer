@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='results.css') }}">
     <script src="{{ url_for('static', filename='results.js') }}" defer></script>
 </head>
-<body>
+<body class="results-page">
 <main class="container">
     <nav class="results-navigation" aria-label="Project pages">
         <a href="{{ url_for('fetch_page') }}">Fetch data</a>
@@ -19,11 +19,6 @@
         <p class="page-eyebrow">Malicious URL Explorer</p>
         <h1>Analysis results</h1>
         <p>See where reported malware URLs are hosted and how daily reports change over time.</p>
-        <ol class="workflow-steps" aria-label="How to use the project">
-            <li><span>1</span> Choose records on Fetch</li>
-            <li class="current-step"><span>2</span> Explore them on Results</li>
-            <li><span>3</span> Download charts or summaries</li>
-        </ol>
     </header>
 
     {% if data_error %}
@@ -45,13 +40,14 @@
         <a class="results-link" href="{{ url_for('fetch_page') }}">Change search</a>
     </section>
     {% else %}
-    <section class="results-panel" aria-labelledby="dataset-heading">
+    <section class="results-panel dataset-panel" aria-labelledby="dataset-heading">
         <div class="panel-heading">
-            <h2 id="dataset-heading">Your saved dataset</h2>
-            <a href="{{ url_for('fetch_page') }}" class="secondary-link">Change dataset on Fetch</a>
+            <h2 id="dataset-heading">Saved dataset</h2>
+            <a href="{{ url_for('fetch_page') }}">Change dataset</a>
         </div>
-        <p><strong>{{ saved_count }}</strong> records in the saved dataset.</p>
-        {% if dataset_period %}<p class="dataset-period">Reporting dates in this file: {{ dataset_period }} (UTC)</p>{% endif %}
+        <p class="dataset-overview"><strong>{{ saved_count }}</strong> records{% if dataset_period %}<span>{{ dataset_period }} · UTC</span>{% endif %}</p>
+        <details class="dataset-details">
+            <summary>Dataset details &amp; Fetch selections</summary>
         {% if fetch_metadata %}
         <h3>Fetch selection</h3>
         <dl class="fetch-selection">
@@ -64,14 +60,15 @@
         {% else %}
         <p>Original Fetch selections are unavailable for this imported or older CSV. Run a new Fetch search to record them.</p>
         {% endif %}
-        <p class="dataset-help">This page analyzes a saved snapshot, not a live feed. Country and status filters below only narrow this dataset.</p>
-        <a href="{{ url_for('fetch_page', saved=1) }}">Review saved records</a>
+            <p>This is a saved snapshot. Change search, dates, threat, or tag on Fetch to choose different records.</p>
+            <a href="{{ url_for('fetch_page', saved=1) }}">Review saved records</a>
+        </details>
     </section>
 
     <form method="GET" action="{{ url_for('results_page') }}" class="results-panel country-filter">
         <div class="filter-introduction">
-            <h2>Choose what to explore</h2>
-            <p>Choose a country, status, and chart. Click <strong>Apply filters</strong> to update the results.</p>
+            <h2>Filters &amp; view</h2>
+            <p>Choose a view, then apply your changes.</p>
         </div>
         <div class="form-group">
             <label for="results-country">Hosting country</label>
@@ -84,7 +81,6 @@
                 <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country_labels.get(country, country) }} — {{ '{:,}'.format(country_counts[country]) }} {{ 'URL' if country_counts[country] == 1 else 'URLs' }}</option>
                 {% endfor %}
             </select>
-            <small>Filters statistics and time series. On the map, this country is outlined while all countries stay visible.</small>
         </div>
         <div class="form-group">
             <label for="results-status">URL status</label>
@@ -96,25 +92,29 @@
                 <option value="{{ selected_status }}" selected>{{ selected_status }} (unavailable)</option>
                 {% endif %}
             </select>
-            <small>Online or offline when recorded by URLhaus, not a live availability check.</small>
         </div>
         <fieldset class="chart-choice">
             <legend>Chart</legend>
-            <label><input type="radio" name="view" value="timeseries"{% if selected_view == 'timeseries' %} checked{% endif %}> Time series — Daily additions</label>
-            <label><input type="radio" name="view" value="map"{% if selected_view == 'map' %} checked{% endif %}> Country map — Hosting countries</label>
+            <label><input type="radio" name="view" value="timeseries"{% if selected_view == 'timeseries' %} checked{% endif %}> Time series</label>
+            <label><input type="radio" name="view" value="map"{% if selected_view == 'map' %} checked{% endif %}> Country map</label>
         </fieldset>
         <div class="form-group" id="timeseries-group-controls">
-            <label for="results-group">Group time-series lines by</label>
+            <label for="results-group">Group lines by</label>
             <select id="results-group" name="group_by">
                 {% for value, label in [('total', 'Total'), ('threat', 'Threat category'), ('tag', 'Malware tag')] %}
                 <option value="{{ value }}"{% if selected_group == value %} selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <small>Total gives one daily count. Threat and tag compare categories in the saved dataset.</small>
         </div>
-        <button type="submit">Apply filters</button>
-        <a href="{{ url_for('results_page') }}">Reset</a>
-        <p class="filter-description">Reset shows the entire saved dataset again. Your saved records are never changed by these filters.</p>
+        <details class="filter-help">
+            <summary>About these filters</summary>
+            <p>Only countries in the saved dataset are listed; counts are before status filtering. Country filters the statistics and time series, and outlines that country on the comparison map. Status reflects the saved report, not a live check.</p>
+            <p>Reset restores the full saved dataset. Your source CSV is unchanged.</p>
+        </details>
+        <div class="filter-actions">
+            <a href="{{ url_for('results_page') }}">Reset</a>
+            <button type="submit">Apply filters</button>
+        </div>
     </form>
 
     {% if records.empty %}
@@ -125,7 +125,7 @@
     </section>
     {% endif %}
     {% if not records.empty or selected_view == 'map' %}
-    <section class="results-panel" aria-labelledby="summary-heading">
+    <section class="results-panel statistics-panel" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary statistics</h2>
         <p class="selection-context">Showing {{ records | length }} records · {{ 'All countries' if selected_country == 'all' else country_labels.get(selected_country, selected_country) }} · {{ 'All statuses' if selected_status == 'all' else selected_status | capitalize }}</p>
         <dl class="summary-grid">
@@ -162,30 +162,25 @@
         </details>
     </section>
     <section class="results-panel" aria-labelledby="chart-heading">
+        <div class="panel-heading chart-heading">
         <h2 id="chart-heading">{{ 'Hosting countries' if selected_view == 'map' else 'Daily additions' }}</h2>
+        <a class="results-link save-plot" href="data:image/png;base64,{{ chart_image }}"
+           download="urlhaus-{{ selected_view }}.png">Save Plot (PNG)</a>
+        </div>
         {% if selected_view == 'map' %}
-        <p><strong>Map comparison:</strong> {{ map_record_count }} records across all countries for {{ 'all statuses' if selected_status == 'all' else selected_status }}. The chosen country is outlined; it does not remove other countries.</p>
-        <p>Darker countries have more reported URLs. The logarithmic color scale makes smaller counts easier to compare. It stays fixed for this saved dataset; gray means zero reported URLs in the current status selection.</p>
+        <p class="chart-caption">Map comparison: {{ map_record_count }} records across all countries · {{ 'all statuses' if selected_status == 'all' else selected_status }}. Orange outlines your selection; blue shows counts on a fixed log scale.</p>
         {% else %}
         <p>{{ 'One count per day' if selected_group == 'total' else 'Separate daily lines by threat category' if selected_group == 'threat' else 'Separate daily lines by malware tag' }}, with a dashed trend for all records in the current selection.</p>
         {% if selected_group == 'tag' %}
-        <p>Tag lines can overlap. Up to 10 most frequent tags in the current selection are shown. Untagged records are excluded from tag lines. The trend describes all records in the current country/status selection.</p>
+        <p class="chart-caption">Top 10 tags; groups may overlap. The dashed trend represents the total.</p>
         {% endif %}
         {% endif %}
         <img class="results-chart" src="data:image/png;base64,{{ chart_image }}"
              alt="{{ 'World map of reported URL counts by hosting country' if selected_view == 'map' else 'Daily reported URL counts with a fitted linear trend' }}">
-        <a class="results-link save-plot" href="data:image/png;base64,{{ chart_image }}"
-           download="urlhaus-{{ selected_view }}.png">Save Plot (PNG)</a>
-        <p class="download-help">Downloads the exact chart displayed above{% if selected_view == 'map' %}, including the all-country comparison and country outline{% endif %}.</p>
-        {% if selected_view == 'map' %}
-        <p>Statistics and summary CSVs describe your selected country/status. The map compares all countries under that status filter.</p>
-        {% else %}
-        <p>The chart uses the same country and status filters as the statistics above.</p>
-        {% endif %}
         <details class="reading-guide">
             <summary>How to read this chart</summary>
             {% if selected_view == 'map' %}
-            <p>The logarithmic color scale shows counts: equal color steps represent multiplication, such as 1 → 10 → 100 → 1,000. Gray countries have zero records in this selection; that does not mean they are threat-free. Counts are not adjusted for population or server count, and multiple URLs can share one host.</p>
+            <p>The map compares all countries under the status filter; statistics and CSV summaries remain country-filtered. The logarithmic color scale shows counts: equal color steps represent multiplication, such as 1 → 10 → 100 → 1,000. Gray countries have zero records in this selection; that does not mean they are threat-free. Counts are not adjusted for population or server count, and multiple URLs can share one host.</p>
             <p>Hosting country describes server infrastructure, not the attacker's location. A country with no colored records is not necessarily free of threats.</p>
             {% else %}
             <p>The horizontal axis is the UTC reporting date; the vertical axis is newly reported URLs. These are additions to URLhaus, not the dates attacks began.</p>
@@ -197,8 +192,9 @@
         </details>
     </section>
     {% if not records.empty %}
-    <section class="results-panel" aria-labelledby="exports-heading">
-        <h2 id="exports-heading">Download summary CSVs</h2>
+    <details class="results-panel exports-panel"{% if saved_files or save_error %} open{% endif %}>
+        <summary id="exports-heading">Export summaries <span>CSV downloads &amp; local saving</span></summary>
+        <h2 class="export-subheading">Download summary CSVs</h2>
         <p>Take the current analysis with you. CSV files open in a spreadsheet and contain summary counts, not individual URLs.</p>
         <ul class="summary-downloads">
             {% for name, label in [('by_country', 'By country'), ('by_threat', 'By threat'), ('by_tag', 'By malware tag'), ('daily_additions', 'Daily additions'), ('status_summary', 'Status summary')] %}
@@ -220,9 +216,8 @@
         {% endif %}
         {% if save_error %}<p class="error" role="alert">{{ save_error }}</p>{% endif %}
         </details>
-    </section>
+    </details>
     {% endif %}
-    <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
     {% endif %}
     {% endif %}
 
