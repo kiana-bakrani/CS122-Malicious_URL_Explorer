@@ -32,7 +32,7 @@ def test_grouping_control_passes_applied_choice_to_chart(monkeypatch, group):
 
 
 @pytest.mark.parametrize("view", ["timeseries", "map"])
-def test_selected_chart_uses_the_same_filtered_records_as_statistics(monkeypatch, view):
+def test_charts_use_their_documented_country_scope(monkeypatch, view):
     records = pd.DataFrame({
         "id": ["1", "2", "3"],
         "dateadded": ["2026-11-01", "2026-11-02", "2026-11-03"],
@@ -46,15 +46,15 @@ def test_selected_chart_uses_the_same_filtered_records_as_statistics(monkeypatch
     original_builder = getattr(web, name)
     received = []
 
-    def capture_selection(selection):
+    def capture_selection(selection, **kwargs):
         received.extend(selection["id"].tolist())
-        return original_builder(selection)
+        return original_builder(selection, **kwargs)
 
     monkeypatch.setattr(web, name, capture_selection)
     html = web.app.test_client().get("/results", query_string={
         "view": view, "country": "US", "tag": "mirai", "status": "offline"
     }).get_data(as_text=True)
-    assert received == ["1"]
+    assert received == (["1", "3"] if view == "map" else ["1"])
     assert "Showing 1 records" in html
     assert f'value="{view}" checked' in html
     assert 'name="tag"' not in html
@@ -70,14 +70,15 @@ def test_selected_chart_uses_the_same_filtered_records_as_statistics(monkeypatch
     assert "connected in a later section" not in html
 
 
-def test_empty_filter_selection_does_not_render_chart(monkeypatch):
+def test_empty_country_selection_keeps_map_comparison_but_hides_exports(monkeypatch):
     monkeypatch.setattr(web, "load_filtered_data", lambda: pd.DataFrame({
         "dateadded": ["2026-11-01"], "url_status": ["online"], "country": ["US"],
     }))
     html = web.app.test_client().get("/results?country=DE&view=map").get_data(as_text=True)
     assert "No records match these filters" in html
-    assert "data:image/png" not in html
-    assert "Save Plot" not in html
+    assert "data:image/png" in html
+    assert "Save summaries locally" not in html
+    assert "Download summary CSVs" not in html
     assert 'value="map" checked' in html
 
 

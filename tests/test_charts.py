@@ -84,3 +84,50 @@ def test_tag_chart_only_shows_selected_tag_lines():
     labels = [line.get_label() for line in fig.axes[0].lines]
     assert "mirai" in labels
     assert "elf" not in labels
+
+
+def test_country_selection_preserves_comparison_and_reference_scale(tmp_path):
+    import json
+    features = []
+    for code, longitude in [("US", 0), ("CA", 5)]:
+        ring = [[longitude, 0], [longitude + 1, 0], [longitude + 1, 1], [longitude, 0]]
+        features.append({"properties": {"ISO_A2_EH": code},
+                         "geometry": {"type": "Polygon", "coordinates": [ring]}})
+    path = tmp_path / "boundaries.json"
+    path.write_text(json.dumps({"features": features}))
+    reference = pd.DataFrame({"country": ["US"] * 3 + ["CA"] + ["Unknown"] * 8})
+    status_selection = pd.DataFrame({"country": ["US", "CA", "Unknown"]})
+    for country, longitude in [("US", 0), ("CA", 5)]:
+        fig = create_country_map(status_selection, path, selected_country=country, reference_records=reference)
+        colors, outline = fig.axes[0].collections
+        assert list(colors.get_array()) == [1, 1]  # Other country remains visible.
+        assert colors.norm.vmax == 10  # Fixed minimum decade, not selected country/status.
+        assert outline.get_paths()[0].vertices[0][0] == longitude
+        assert any(country in text.get_text() for text in fig.axes[0].get_legend().get_texts())
+    unknown = create_country_map(status_selection, path, selected_country="Unknown", reference_records=reference)
+    assert len(unknown.axes[0].collections) == 1
+    assert "no boundary" in unknown.axes[0].texts[0].get_text()
+
+
+@pytest.mark.parametrize("countries", [[], ["US"], ["US"] * 1000 + ["CA"] * 10])
+def test_log_map_handles_zero_one_and_skewed_counts(tmp_path, countries):
+    import json
+    import numpy as np
+    from matplotlib.colors import LogNorm
+    path = tmp_path / "boundaries.json"
+    path.write_text(json.dumps({"features": [
+        {"properties": {"ISO_A2_EH": code},
+         "geometry": {"type": "Polygon", "coordinates": [[[x, 0], [x+1, 0], [x+1, 1], [x, 0]]]}}
+        for code, x in [("US", 0), ("CA", 5)]
+    ]}))
+    fig = create_country_map(pd.DataFrame({"country": countries}), path)
+    colors = fig.axes[0].collections[0]
+    assert isinstance(colors.norm, LogNorm)
+    assert colors.norm.vmin == 1
+    assert np.ma.getmaskarray(colors.get_array()).tolist() == ["US" not in countries, "CA" not in countries]
+    if len(countries) > 1:
+        assert colors.norm.vmax == 1000
+        assert colors.norm(10) == pytest.approx(1/3)
+        assert colors.get_array().tolist() == [1000, 10]
+    fig.savefig(BytesIO(), format="png", bbox_inches="tight")
+    assert "logarithmic" in fig.axes[1].get_ylabel()

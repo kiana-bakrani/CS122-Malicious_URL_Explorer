@@ -84,7 +84,7 @@
                 <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country_labels.get(country, country) }}</option>
                 {% endfor %}
             </select>
-            <small>Where the URL's server is hosted. Unknown means no country was resolved.</small>
+            <small>Filters statistics and time series. On the map, this country is outlined while all countries stay visible.</small>
         </div>
         <div class="form-group">
             <label for="results-status">URL status</label>
@@ -121,8 +121,10 @@
     <section class="results-panel" role="status">
         <h2>No records match these filters</h2>
         <p>Change the country or status, or reset the Results filters.</p>
+        {% if selected_view == 'map' %}<p>The map still shows other countries for comparison. No summary files will be saved for this empty selection.</p>{% endif %}
     </section>
-    {% else %}
+    {% endif %}
+    {% if not records.empty or selected_view == 'map' %}
     <section class="results-panel" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary statistics</h2>
         <p class="selection-context">Showing {{ records | length }} records · {{ 'All countries' if selected_country == 'all' else country_labels.get(selected_country, selected_country) }} · {{ 'All statuses' if selected_status == 'all' else selected_status | capitalize }}</p>
@@ -162,7 +164,8 @@
     <section class="results-panel" aria-labelledby="chart-heading">
         <h2 id="chart-heading">{{ 'Hosting countries' if selected_view == 'map' else 'Daily additions' }}</h2>
         {% if selected_view == 'map' %}
-        <p>Darker countries have more reported URLs in this selection. Unknown and unmapped locations are counted separately below the map.</p>
+        <p><strong>Map comparison:</strong> {{ map_record_count }} records across all countries for {{ 'all statuses' if selected_status == 'all' else selected_status }}. The chosen country is outlined; it does not remove other countries.</p>
+        <p>Darker countries have more reported URLs. The logarithmic color scale makes smaller counts easier to compare. It stays fixed for this saved dataset; gray means zero reported URLs in the current status selection.</p>
         {% else %}
         <p>{{ 'One count per day' if selected_group == 'total' else 'Separate daily lines by threat category' if selected_group == 'threat' else 'Separate daily lines by malware tag' }}, with a dashed trend for all records in the current selection.</p>
         {% if selected_group == 'tag' %}
@@ -173,12 +176,16 @@
              alt="{{ 'World map of reported URL counts by hosting country' if selected_view == 'map' else 'Daily reported URL counts with a fitted linear trend' }}">
         <a class="results-link save-plot" href="data:image/png;base64,{{ chart_image }}"
            download="urlhaus-{{ selected_view }}.png">Save Plot (PNG)</a>
-        <p class="download-help">Downloads the chart currently displayed above, including your applied filters.</p>
+        <p class="download-help">Downloads the exact chart displayed above{% if selected_view == 'map' %}, including the all-country comparison and country outline{% endif %}.</p>
+        {% if selected_view == 'map' %}
+        <p>Statistics and summary CSVs describe your selected country/status. The map compares all countries under that status filter.</p>
+        {% else %}
         <p>The chart uses the same country and status filters as the statistics above.</p>
+        {% endif %}
         <details class="reading-guide">
             <summary>How to read this chart</summary>
             {% if selected_view == 'map' %}
-            <p>The color scale shows URL counts, not rates adjusted for population or server count. Multiple URLs can share one host.</p>
+            <p>The logarithmic color scale shows counts: equal color steps represent multiplication, such as 1 → 10 → 100 → 1,000. Gray countries have zero records in this selection; that does not mean they are threat-free. Counts are not adjusted for population or server count, and multiple URLs can share one host.</p>
             <p>Hosting country describes server infrastructure, not the attacker's location. A country with no colored records is not necessarily free of threats.</p>
             {% else %}
             <p>The horizontal axis is the UTC reporting date; the vertical axis is newly reported URLs. These are additions to URLhaus, not the dates attacks began.</p>
@@ -189,6 +196,7 @@
             {% endif %}
         </details>
     </section>
+    {% if not records.empty %}
     <section class="results-panel" aria-labelledby="exports-heading">
         <h2 id="exports-heading">Download summary CSVs</h2>
         <p>Take the current analysis with you. CSV files open in a spreadsheet and contain summary counts, not individual URLs.</p>
@@ -213,6 +221,7 @@
         {% if save_error %}<p class="error" role="alert">{{ save_error }}</p>{% endif %}
         </details>
     </section>
+    {% endif %}
     <p class="results-note">Reporting dates describe additions to URLhaus, not attack start dates. Hosting countries describe infrastructure, not attacker origin.</p>
     {% endif %}
     {% endif %}

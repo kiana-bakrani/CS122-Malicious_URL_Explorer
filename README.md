@@ -209,3 +209,19 @@ repeated timestamped observations would be required.
 - Add more geographic detail for small territories absent from the simplified map.
 - Offer rate-normalized comparisons when appropriate reference data is available.
 - Support multiple named saved datasets instead of replacing one active selection.
+
+## Comparing countries on the map
+
+Country selection filters the statistics, time series, and summary CSVs. The map
+keeps all countries visible and outlines the chosen country in orange, so a small
+country count does not become the darkest color just because it was selected.
+The map applies the status filter across all countries, while its color scale
+uses logarithmic normalization and stays fixed to the full saved dataset.
+Equal color steps represent multiplicative count changes (1, 10, 100, and so on).
+Positive counts are blue; zero-count countries are neutral gray. The scale starts
+at 1 and ends at the largest mapped-country count, with a minimum upper bound of
+10 for very small or empty datasets. Counts and percentages themselves are unchanged.
+Selecting Unknown does not create a location; unmapped records remain separate.
+If a chosen country has no matching records, the comparison map remains visible
+while summary-file actions are unavailable. Save Plot downloads that displayed
+comparison map; summary CSVs still describe the selected country and status.

@@ -269,6 +269,7 @@ def results_page():
     countries = []
     country_labels = {}
     dataset_period = None
+    map_record_count = 0
     saved_count = 0
     filters = results_filter_values()
     selected_country = filters["country"]
@@ -290,11 +291,18 @@ def results_page():
             valid_dates = records["dateadded"].dropna()
             if not valid_dates.empty:
                 dataset_period = f"{valid_dates.min():%b %d, %Y} – {valid_dates.max():%b %d, %Y}"
+            reference_records = records
+            map_records = filter_results_records(records, country="all", status=selected_status)
+            map_record_count = len(map_records)
             records = filter_results_records(records, **filters)
             summary = summarize_status(records)
-            if not records.empty:
+            if not records.empty or selected_view == "map":
                 if selected_view == "map":
-                    figure = create_country_map(records)
+                    figure = create_country_map(
+                        map_records, selected_country=selected_country,
+                        reference_records=reference_records,
+                        status_label=selected_status,
+                    )
                 elif selected_group == "total":
                     figure = create_timeseries_chart(records)
                 else:
@@ -303,7 +311,7 @@ def results_page():
                 figure.savefig(image, format="png", dpi=120, bbox_inches="tight")
                 chart_image = base64.b64encode(image.getvalue()).decode("ascii")
                 figure.clear()
-                if request.method == "POST":
+                if request.method == "POST" and not records.empty:
                     if request.args.get("snapshot") and request.args["snapshot"] != snapshot_id:
                         save_error = "The Fetch dataset changed. Review these refreshed results before saving summaries."
                     else:
@@ -329,6 +337,7 @@ def results_page():
         fetch_metadata=fetch_metadata, data_error=data_error,
         snapshot_id=snapshot_id,
         country_labels=country_labels, dataset_period=dataset_period,
+        map_record_count=map_record_count,
     )
 
 

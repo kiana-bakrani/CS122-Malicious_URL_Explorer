@@ -6,25 +6,29 @@ from pathlib import Path
 import numpy as np
 import matplotlib.dates as mdates
 from matplotlib.collections import PolyCollection
-from matplotlib.colors import Normalize
+from matplotlib.colors import LogNorm, LinearSegmentedColormap
+from matplotlib.ticker import FuncFormatter
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
 
 from data_visualization.analysis import calculate_daily_trend, count_daily_groups
 
 
 def country_display_names():
-    """Use names from the local boundary file; codes still work if it is absent."""
+    """Read boundary names, with a fallback for Singapore's omitted small polygon."""
+    names = {"SG": "Singapore"}
     path = Path(__file__).resolve().parent.parent / "data/cache/countries.geojson"
     try:
         with path.open(encoding="utf-8") as source:
             features = json.load(source)["features"]
-        return {
+        names.update({
             feature["properties"]["ISO_A2_EH"]: feature["properties"]["NAME_EN"]
             for feature in features
             if len(feature["properties"].get("ISO_A2_EH", "")) == 2
-        }
+        })
     except (OSError, ValueError, KeyError):
-        return {}
+        pass
+    return names
 
 
 def create_timeseries_chart(records, group_by="total", selected_tags=None):
@@ -96,17 +100,22 @@ def create_timeseries_chart(records, group_by="total", selected_tags=None):
     return fig
 
 
-def create_country_map(records, boundary_path=None):
+def create_country_map(records, boundary_path=None, selected_country="all", reference_records=None, status_label=None):
     """Color Natural Earth country polygons using prepared hosting-country codes.
 
     Boundary data is downloaded separately into data/cache, not stored in Git.
     Unknown/unmapped records are reported separately, never assigned a location.
+    Pass all countries for the active status selection. Country selection adds an
+    outline only; reference_records fixes the color scale to the saved dataset.
     """
     if boundary_path is None:
         boundary_path = Path(__file__).resolve().parent.parent / "data/cache/countries.geojson"
     fig = Figure(figsize=(10, 5.5), layout="constrained")
     ax = fig.subplots()
-    ax.set_title("Reported URLs by hosting country", loc="left", fontweight="bold")
+    title = "Reported URLs by hosting country"
+    if status_label:
+        title += " — " + ("all statuses" if status_label == "all" else status_label)
+    ax.set_title(title, loc="left", fontweight="bold")
     if not Path(boundary_path).is_file():
         ax.text(0.5, 0.5, "Map boundaries missing. Follow the README map setup.",
                 transform=ax.transAxes, ha="center", va="center")
@@ -118,6 +127,8 @@ def create_country_map(records, boundary_path=None):
     counts = records["country"].astype(str).str.strip().str.upper().value_counts()
     polygons = []
     values = []
+    highlighted = []
+    selected_name = selected_country
     mapped_codes = set()
     for feature in features:
         properties = feature["properties"]
@@ -136,17 +147,48 @@ def create_country_map(records, boundary_path=None):
         for part in parts:
             polygons.append(part[0])
             values.append(int(counts.get(code, 0)))
+            if code == selected_country:
+                highlighted.append(part[0])
+                selected_name = properties.get("NAME_EN", code)
 
+    reference = records if reference_records is None else reference_records
+    reference_counts = reference["country"].astype(str).str.strip().str.upper().value_counts()
+    mapped_counts = reference_counts[reference_counts.index.isin(mapped_codes)]
+    # Logarithms need positive limits. A minimum decade also handles 0/1-only data.
+    maximum = max(int(mapped_counts.max()), 10) if not mapped_counts.empty else 10
+    cmap = LinearSegmentedColormap.from_list(
+        "url_counts", ["#c6dbef", "#6baed6", "#2171b5", "#08306b"]
+    )
+    cmap.set_bad("#e2e5e9")
     collection = PolyCollection(polygons, edgecolors="gray", linewidths=0.3,
-                                cmap="Blues", norm=Normalize(0, max(values + [1])))
-    collection.set_array(np.asarray(values))
+                                cmap=cmap, norm=LogNorm(vmin=1, vmax=maximum))
+    collection.set_array(np.ma.masked_less_equal(np.asarray(values), 0))
     ax.add_collection(collection)
+    legend_items = [Patch(facecolor="#e2e5e9", edgecolor="gray", label="0 reported URLs in this selection")]
+    if highlighted:
+        ax.add_collection(PolyCollection(
+            highlighted, facecolors="none", edgecolors="#c35400", linewidths=1.8, zorder=3,
+        ))
+        label = f"Selected: {selected_name} ({int(counts.get(selected_country, 0))} URLs)"
+        legend_items.append(Patch(facecolor="none", edgecolor="#c35400", label=label))
+    elif selected_country != "all":
+        ax.text(0.02, 0.13, f"{selected_country}: no boundary to outline",
+                transform=ax.transAxes, fontsize=8,
+                bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"})
+    ax.legend(handles=legend_items, loc="lower left", fontsize=8)
     ax.set_xlim(-180, 180)
     ax.set_ylim(-60, 90)
     ax.set_aspect("equal")
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    fig.colorbar(collection, ax=ax, shrink=0.7, label="Reported URL count")
+    ticks = [10 ** power for power in range(int(np.log10(maximum)) + 1)]
+    if ticks[-1] != maximum:
+        ticks.append(maximum)
+    colorbar = fig.colorbar(
+        collection, ax=ax, shrink=0.7, ticks=ticks,
+        label="Reported URL count (logarithmic; fixed dataset scale)",
+    )
+    colorbar.ax.yaxis.set_major_formatter(FuncFormatter(lambda value, position: f"{value:,.0f}"))
     mapped = int(counts[counts.index.isin(mapped_codes)].sum())
     date_note = ""
     if "dateadded" in records:
