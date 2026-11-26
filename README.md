@@ -225,3 +225,9 @@ Selecting Unknown does not create a location; unmapped records remain separate.
 If a chosen country has no matching records, the comparison map remains visible
 while summary-file actions are unavailable. Save Plot downloads that displayed
 comparison map; summary CSVs still describe the selected country and status.
+
+Hosting-country names use pycountry's ISO lookup, independent of map boundaries.
+The dropdown lists only locations with records in the saved dataset and shows
+their counts before Results status filtering, with the most common first. Unknown
+locations appear last; unrecognized two-letter codes remain labeled as unknown
+codes. Names do not imply that the simplified map contains a drawable boundary.

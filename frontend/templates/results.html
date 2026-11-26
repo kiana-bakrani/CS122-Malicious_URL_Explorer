@@ -76,12 +76,12 @@
         <div class="form-group">
             <label for="results-country">Hosting country</label>
             <select id="results-country" name="country">
-                <option value="all"{% if selected_country == 'all' %} selected{% endif %}>All countries</option>
+                <option value="all"{% if selected_country == 'all' %} selected{% endif %}>All countries — {{ '{:,}'.format(saved_count) }} URLs</option>
                 {% if selected_country != 'all' and selected_country not in countries %}
                 <option value="{{ selected_country }}" selected>{{ selected_country }} (unavailable)</option>
                 {% endif %}
                 {% for country in countries %}
-                <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country_labels.get(country, country) }}</option>
+                <option value="{{ country }}"{% if country == selected_country %} selected{% endif %}>{{ country_labels.get(country, country) }} — {{ '{:,}'.format(country_counts[country]) }} {{ 'URL' if country_counts[country] == 1 else 'URLs' }}</option>
                 {% endfor %}
             </select>
             <small>Filters statistics and time series. On the map, this country is outlined while all countries stay visible.</small>

@@ -8,6 +8,22 @@ import re
 import app as web
 
 
+def test_country_dropdown_names_counts_and_only_saved_locations(monkeypatch):
+    records = pd.DataFrame({
+        "dateadded": ["2026-11-01"] * 5,
+        "country": ["US", "US", "SG", "ZZ", None],
+        "url_status": ["online", "offline", "online", "offline", None],
+    })
+    monkeypatch.setattr(web, "load_filtered_data", lambda: records)
+    html = web.app.test_client().get("/results?status=offline").get_data(as_text=True)
+    assert "Singapore (SG) — 1 URL" in html
+    assert "United States (US) — 2 URLs" in html
+    assert "Unknown country code (ZZ) — 1 URL" in html
+    assert 'value="CA"' not in html  # The lookup must not add absent countries.
+    assert html.index('value="US"') < html.index('value="SG"') < html.index('value="Unknown"')
+    assert "Showing 2 records" in html  # Counts in options are pre-status totals.
+
+
 @pytest.mark.parametrize("group", ["threat", "tag"])
 def test_grouping_control_passes_applied_choice_to_chart(monkeypatch, group):
     from matplotlib.figure import Figure

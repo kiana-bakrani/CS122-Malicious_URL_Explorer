@@ -268,6 +268,7 @@ def results_page():
         selected_group = "total"
     countries = []
     country_labels = {}
+    country_counts = {}
     dataset_period = None
     map_record_count = 0
     saved_count = 0
@@ -283,11 +284,15 @@ def results_page():
             saved_count = len(records)
             countries = sorted(records["country"].unique().tolist())
             names = country_display_names()
+            country_counts = records["country"].value_counts().to_dict()
             country_labels = {
                 code: ("Unknown hosting country" if code == "Unknown"
-                       else f"{names[code]} ({code})" if code in names else code)
+                       else f"{names[code]} ({code})" if code in names else f"Unknown country code ({code})")
                 for code in countries
             }
+            countries.sort(key=lambda code: (
+                code == "Unknown", -country_counts[code], country_labels[code].casefold()
+            ))
             valid_dates = records["dateadded"].dropna()
             if not valid_dates.empty:
                 dataset_period = f"{valid_dates.min():%b %d, %Y} – {valid_dates.max():%b %d, %Y}"
@@ -338,6 +343,7 @@ def results_page():
         snapshot_id=snapshot_id,
         country_labels=country_labels, dataset_period=dataset_period,
         map_record_count=map_record_count,
+        country_counts=country_counts,
     )
 
 

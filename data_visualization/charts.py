@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pycountry
 import matplotlib.dates as mdates
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import LogNorm, LinearSegmentedColormap
@@ -15,20 +16,11 @@ from data_visualization.analysis import calculate_daily_trend, count_daily_group
 
 
 def country_display_names():
-    """Read boundary names, with a fallback for Singapore's omitted small polygon."""
-    names = {"SG": "Singapore"}
-    path = Path(__file__).resolve().parent.parent / "data/cache/countries.geojson"
-    try:
-        with path.open(encoding="utf-8") as source:
-            features = json.load(source)["features"]
-        names.update({
-            feature["properties"]["ISO_A2_EH"]: feature["properties"]["NAME_EN"]
-            for feature in features
-            if len(feature["properties"].get("ISO_A2_EH", "")) == 2
-        })
-    except (OSError, ValueError, KeyError):
-        pass
-    return names
+    """Look up ISO country names independently of map boundary coverage."""
+    return {
+        country.alpha_2: getattr(country, "common_name", country.name)
+        for country in pycountry.countries
+    }
 
 
 def create_timeseries_chart(records, group_by="total", selected_tags=None):

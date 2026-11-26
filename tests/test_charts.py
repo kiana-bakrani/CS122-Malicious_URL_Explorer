@@ -9,6 +9,15 @@ from data_visualization.analysis import prepare_records
 from data_visualization.charts import create_timeseries_chart, create_country_map
 
 
+def test_small_country_names_do_not_depend_on_map_coverage():
+    from data_visualization.charts import country_display_names
+    names = country_display_names()
+    assert names["SG"] == "Singapore"
+    assert names["MT"] == "Malta"
+    assert names["LI"] == "Liechtenstein"
+    assert "ZZ" not in names
+
+
 def test_chart_displays_daily_counts_trend_and_can_save_png():
     records = prepare_records(pd.DataFrame({
         "dateadded": ["2026-11-01"] + ["2026-11-03"] * 3,
