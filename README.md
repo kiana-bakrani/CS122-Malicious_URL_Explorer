@@ -7,11 +7,11 @@
 
 ## Project Description
 
-Malicious URL Explorer is a Python application that uses URLhaus data to explore reported malware distribution URLs by threat category, tag, hosting country, and date.
-Users will collect recent records through a Flask web interface and filter the dataset by date and threat category or tag.
-The application will store defanged URL records locally as CSV files, with cached hosting-country lookups to reduce repeated requests.
-It will summarize URL counts by country and category, calculate daily additions and offline percentages, and estimate observed online durations when repeated status observations are available.
-A world map with page filters and a time-series chart will help users compare geographic patterns and changes over time without opening the reported URLs.
+Malicious URL Explorer is a Python application that uses URLhaus reports to explore malware distribution URLs by threat category, tag, hosting country, and reporting date.
+Users choose records on a Flask Fetch page, then analyze the saved dataset on a separate Results page.
+The application saves URL metadata in local CSV files, displays defanged URLs, and caches hosting-country lookups.
+It calculates daily reporting counts, category summaries, offline percentages, and a fitted linear trend using pandas and NumPy.
+Matplotlib time-series charts and a country comparison map help users interpret the selected records and export plots or summary tables without opening the reported URLs.
 
 ## Run on a Mac — start here
 
@@ -70,7 +70,7 @@ unset URL_EXPLORER_DEMO
 Open **http://127.0.0.1:5124/fetch**, choose the search/date/threat/tag settings,
 click **Search**, then **View Results**. Downloads use a five-minute cache.
 If an existing `data/filtered_urls.csv` is available, you can open Results directly
-without a key or a new download. Copy its matching `.metadata.json` file too if you
+without a key or a new download. Copy its matching `filtered_urls.metadata.json` file too if you
 want the original Fetch settings to appear.
 
 ### Troubleshooting
@@ -98,19 +98,21 @@ an API key and do not visit reported malware URLs.
 
 - **Interface:** Build a Flask web interface with a Fetch page owned by Author #1 and a Results page owned by Author #2, with at least ten interactive controls across the two pages.
 - **Data collection and storage (Author #1 — Thel Nu Zaw):** Retrieve URLhaus metadata, organize defanged URL records in local CSV files, and cache hosting-country lookups.
-- **Data analysis (Author #2 — Kiana Bakrani):** Summarize records by country, threat category, and tag; count daily additions; calculate offline percentages; and estimate observed online durations when repeated observations are available.
+- **Data analysis (Author #2 — Kiana Bakrani):** Summarize country, threat, and tag counts; calculate daily additions and offline percentages; and fit a linear trend. Online-duration analysis remains a future improvement requiring repeated observations.
 - **Visualization and summary storage (Author #2 — Kiana Bakrani):** Create a world map and daily time-series chart, support filtering and plot export, and save summary CSV files locally.
 
 ### Interface Plan
 
-We plan to build a Python Flask application with two pages, one implemented by each author.
+The Flask application has two pages, with responsibilities split between the authors.
 
 | Page | Owner | Planned interactive controls |
 | --- | --- | --- |
-| Fetch | Thel Nu Zaw (Author #1) | Start-date input, end-date input, threat/tag filter, Fetch button, preview-table pagination control, Results navigation button |
+| Fetch | Thel Nu Zaw (Author #1) | URL search, start/end dates, threat/tag selection, Search button, preview pagination, Results navigation |
 | Results | Kiana Bakrani (Author #2) | Country dropdown, status dropdown, map/time-series toggle, line-grouping dropdown, Apply filters button, Save Plot button, Fetch navigation button |
 
-This provides at least twelve interactive controls across two pages. The Fetch page will also show a progress/status label and a preview table. The Results page will show the selected visualization and summary statistics, and display a clear message when filters return no records. The shared interface outline is preliminary; each author will refine their own page during implementation.
+The two pages provide more than ten interactive controls. Fetch shows status and a paginated preview. Results shows statistics, charts, expandable explanations, and export actions; empty selections display a clear message. URL search, date, threat, and tag selection belong on Fetch. Results uses country/status filters and chart controls.
+
+The original collection/storage responsibility plan is retained below. The setup instructions and Results sections describe the current implementation.
 
 ### Data Collection and Storage Plan (written by Author #1)
 
@@ -124,21 +126,47 @@ I will store the cleaned records locally as CSV files at `data/cleaned_urls.csv`
 
 The Fetch page will display the data retrieval status, the number of records collected, and a paginated preview table. Users will be able to navigate to the Results page after data collection is complete. I will also implement a refresh mechanism that reuses locally stored records when appropriate and respects URLhaus's minimum five-minute refresh interval. Downloaded datasets, cached lookups, and authentication credentials will be excluded from Git, while the repository will include setup instructions and documentation explaining the CSV structure and data collection process.
 
-### Data Analysis and Visualization Plan (written by Author #2)
+### Data Analysis and Visualization (Author #2)
 
 **Author: Kiana Bakrani**
 
-I will use pandas to clean and analyze the CSV records supplied by Author #1, parse dates in UTC, and remove duplicate URL records using the URLhaus record ID where available. I will group records by hosting country and threat category, compare malware tags where the threat field has little variation, and count newly reported URLs per day using their date-added values. Daily counts describe additions to URLhaus rather than the dates attacks first occurred. Missing hosting-country values will remain in an Unknown group and will be reported separately from countries plotted on the map.
+pandas prepares a copy of the saved records, parses reporting dates in UTC, removes
+duplicate known IDs, and groups records by country, threat, tag, and reporting day.
+Unknown countries remain in the analysis rather than being assigned a location.
+Daily counts represent reporting to URLhaus, not when attacks began. Zero-count
+days between the first and last valid reporting dates are included.
 
-I will calculate the percentage of records marked offline within the selected dataset and filters, showing the record counts alongside each percentage. Unknown or missing status values will be reported separately and excluded from the online/offline percentage denominator. If repeated timestamped status observations are available, I will estimate observed online durations from the first online observation to the first subsequent offline observation; URLs still online will be marked ongoing. A single snapshot will support status percentages, but will not be treated as evidence of a URL's full online lifetime.
+Offline percentage is `offline / (online + offline) * 100`. Unknown statuses are
+excluded from that denominator. The interface shows N/A if no known status exists.
+Filtering to offline records necessarily gives 100% offline for that selection.
+These are saved observations, not live availability checks.
 
-I will create a Matplotlib world choropleth map showing URL counts by hosting country and a time-series chart showing newly reported URLs per day, split by threat category or the most frequent malware tags in the saved selection. Each plot will include a descriptive title, date range, legend or color scale, and labeled axes where applicable. Hosting country represents infrastructure location, not the location or nationality of an attacker. Since a record can have several tags, tag-group totals can overlap and will be labeled accordingly.
+NumPy fits a straight line to daily totals using `np.polyfit(days, counts, 1)`.
+The dashed line describes the overall country/status selection, including when
+separate threat or tag lines are shown. It is descriptive, not a forecast; large
+reporting spikes can dominate the fit. Fitted values can be negative even though
+actual URL counts cannot. A weak fit should not be interpreted as evidence of a
+reliable trend in all malicious activity.
 
-I will implement the Results page with country and status filters, leaving URL search, date, threat, and tag selection on Fetch, a map/time-series toggle, and a Save Plot button that exports the currently displayed visualization as a PNG image. I will also save summary CSV files by country, threat category, and date under `data/summaries/`, keeping downloaded records and generated summaries out of Git.
+Matplotlib produces the time series and a world choropleth map. Time-series lines
+can show totals, threat categories, or up to ten frequent malware tags. Tags can
+overlap because one record may have several tags. The map compares all countries
+under the status filter, outlines the selected country, and uses a fixed
+logarithmic scale. Unknown or unmapped locations are counted separately.
+
+Results supports country/status filtering, chart switching, grouping, PNG plot
+downloads, and five summary tables: country, threat, tag, daily additions, and status.
+Tables can be downloaded individually or saved together under `data/summaries/`
+(`data/demo/summaries/` in sample mode). CSV summaries and statistics are
+country/status-filtered even when the map displays the all-country comparison.
+
+Online-duration estimates are **not implemented**: the current pipeline stores
+one snapshot, rather than repeated timestamped status observations. The
+`last_online` field alone is not a complete online lifetime.
 
 ## Data Source and Access
 
-The planned source is the [URLhaus Community API](https://urlhaus.abuse.ch/api/). Its recent export covers URLs added within the past 30 days, so available date filters will reflect the downloaded coverage. Access requires a free abuse.ch Auth-Key, which will be kept in local configuration and excluded from Git. Downloads will respect the documented minimum five-minute refresh interval.
+The live data source is the [URLhaus Community API](https://urlhaus.abuse.ch/api/). Its recent export covers URLs added within the past 30 days, so available date filters will reflect the downloaded coverage. Access requires a free abuse.ch Auth-Key, which will be kept in local configuration and excluded from Git. Downloads will respect the documented minimum five-minute refresh interval.
 
 URLhaus focuses on malware distribution URLs; the threat field may offer limited variety, so malware tags will provide additional comparison categories. The application will process metadata and display URLs as defanged text without fetching their contents.
 
@@ -161,8 +189,8 @@ curl --fail --location https://raw.githubusercontent.com/nvkelso/natural-earth-v
 This boundary dataset is excluded from Git along with the other downloaded data.
 It is a simplified world map; small territories may not appear, so records with
 unmapped codes are reported separately. Chart counts come from the filtered
-URLhaus records, not from the boundary file. The Matplotlib map is a static figure
-that will be displayed on the Results page; it replaces the earlier Plotly map plan.
+URLhaus records, not from the boundary file. The map is a static Matplotlib figure
+displayed on Results; the page controls determine its comparison and highlight.
 
 ### Hosting-country lookup (Author #1)
 
@@ -198,10 +226,9 @@ repeated timestamped observations would be required.
 2. Choose country/status filters, chart type, and time-series grouping, then click
    **Apply filters**. **Reset** restores the entire saved dataset.
 3. Read the statistics and expand the on-page explanations if needed. Use
-   **Save Plot (PNG)** or a summary CSV link to download the current analysis.
-4. Expand the optional local-save section to write all five summary CSVs on the
+   **Save Plot (PNG)** beside the chart title to download the displayed figure.
+4. Expand **Export summaries** for individual CSV downloads. Expand its optional local-save section to write all five summary CSVs on the
    Flask computer. Demo mode uses `data/demo/summaries/`; live mode uses `data/summaries/`.
-
 
 ## Future improvements
 
